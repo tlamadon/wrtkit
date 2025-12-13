@@ -1,0 +1,116 @@
+site_name: WRTKit Documentation
+site_description: A Python library for managing OpenWRT configuration over SSH
+site_author: WRTKit Contributors
+site_url: https://yourusername.github.io/wrtkit
+
+repo_name: yourusername/wrtkit
+repo_url: https://github.com/yourusername/wrtkit
+edit_uri: edit/main/docs/
+
+theme:
+  name: material
+  palette:
+    # Light mode
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    # Dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+  features:
+    - navigation.tabs
+    - navigation.sections
+    - navigation.expand
+    - navigation.top
+    - search.suggest
+    - search.highlight
+    - content.tabs.link
+    - content.code.annotation
+    - content.code.copy
+  icon:
+    repo: fontawesome/brands/github
+
+markdown_extensions:
+  - pymdownx.highlight:
+      anchor_linenums: true
+      line_spans: __span
+      pygments_lang_class: true
+  - pymdownx.inlinehilite
+  - pymdownx.snippets
+  - pymdownx.superfences
+  - pymdownx.tabbed:
+      alternate_style: true
+  - admonition
+  - pymdownx.details
+  - pymdownx.emoji:
+      emoji_index: !!python/name:material.extensions.emoji.twemoji
+      emoji_generator: !!python/name:material.extensions.emoji.to_svg
+  - attr_list
+  - md_in_html
+  - tables
+  - toc:
+      permalink: true
+
+plugins:
+  - search
+  - mkdocstrings:
+      handlers:
+        python:
+          options:
+            docstring_style: google
+            show_source: true
+            show_root_heading: true
+            show_root_full_path: false
+            show_symbol_type_heading: true
+            show_symbol_type_toc: true
+            members_order: source
+
+nav:
+  - Home: index.md
+  - Getting Started:
+    - Installation: getting-started/installation.md
+    - Quick Start: getting-started/quick-start.md
+    - Your First Config: getting-started/first-config.md
+  - User Guide:
+    - Network Configuration: guide/network.md
+    - Wireless Configuration: guide/wireless.md
+    - DHCP Configuration: guide/dhcp.md
+    - Firewall Configuration: guide/firewall.md
+    - SSH Operations: guide/ssh.md
+    - Configuration Management: guide/config-management.md
+  - Examples:
+    - Basic Router: examples/basic-router.md
+    - Mesh Network: examples/mesh-network.md
+    - Multiple APs: examples/multiple-aps.md
+    - Advanced Firewall: examples/advanced-firewall.md
+  - API Reference:
+    - UCIConfig: api/config.md
+    - Network: api/network.md
+    - Wireless: api/wireless.md
+    - DHCP: api/dhcp.md
+    - Firewall: api/firewall.md
+    - SSH: api/ssh.md
+    - Base Classes: api/base.md
+  - Development:
+    - Contributing: development/contributing.md
+    - Testing: development/testing.md
+    - Publishing: development/publishing.md
+  - Changelog: changelog.md
+
+extra:
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/yourusername/wrtkit
+    - icon: fontawesome/brands/python
+      link: https://pypi.org/project/wrtkit/
+
+copyright: Copyright &copy; 2025 WRTKit Contributors
