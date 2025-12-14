@@ -77,7 +77,8 @@ This happens when:
 **Example:**
 ```python
 # Local config has:
-config.network.interface("lan").proto("static")
+lan = NetworkInterface("lan").with_proto("static")
+config.network.add_interface(lan)
 
 # Remote has:
 network.lan.proto='dhcp'

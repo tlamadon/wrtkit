@@ -10,10 +10,17 @@ WRTKit now supports serial console connections in addition to SSH, making it per
 
 ```python
 from wrtkit import UCIConfig, SerialConnection
+from wrtkit.network import NetworkInterface
 
 # Create your configuration
 config = UCIConfig()
-config.network.interface("lan").proto("static").ipaddr("192.168.1.1")
+
+# Add LAN interface with static IP
+lan = NetworkInterface("lan")\
+    .with_proto("static")\
+    .with_ipaddr("192.168.1.1")\
+    .with_netmask("255.255.255.0")
+config.network.add_interface(lan)
 
 # Connect via serial console
 with SerialConnection(port="/dev/ttyUSB0", baudrate=115200) as serial:
