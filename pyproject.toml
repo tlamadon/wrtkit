@@ -5,14 +5,14 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "wrtkit"
 version = "0.1.0"
-description = "A Python library for managing OpenWRT configuration over SSH"
+description = "A Python library for managing OpenWRT configuration over SSH and serial"
 readme = "README.md"
 requires-python = ">=3.8"
 license = {text = "MIT"}
 authors = [
     {name = "Thibaut Lamadon", email = "thibaut.lamadon@gmail.com"}
 ]
-keywords = ["openwrt", "uci", "network", "configuration", "ssh"]
+keywords = ["openwrt", "uci", "network", "configuration", "ssh", "serial", "console"]
 classifiers = [
     "Development Status :: 3 - Alpha",
     "Intended Audience :: Developers",
@@ -29,6 +29,8 @@ classifiers = [
 ]
 dependencies = [
     "paramiko>=3.0.0",
+    "pyserial>=3.5",
+    "pydantic>=2.0.0",
 ]
 
 [project.optional-dependencies]

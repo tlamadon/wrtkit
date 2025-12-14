@@ -1,6 +1,7 @@
 """Base classes for UCI configuration components."""
 
 from typing import Any, Dict, List, Optional, Union
+from pydantic import BaseModel, Field, ConfigDict
 
 
 class UCICommand:
@@ -35,31 +36,29 @@ class UCICommand:
         )
 
 
-class UCISection:
-    """Base class for UCI configuration sections."""
+class UCISection(BaseModel):
+    """Base class for UCI configuration sections using Pydantic."""
 
-    def __init__(self, package: str, section: str, section_type: str):
-        self.package = package
-        self.section = section
-        self.section_type = section_type
-        self.options: Dict[str, Union[str, List[str]]] = {}
+    model_config = ConfigDict(extra="allow", validate_assignment=True)
 
-    def set_option(self, key: str, value: Union[str, int, bool]) -> None:
-        """Set a single-value option."""
+    # Core UCI metadata
+    _package: str = ""
+    _section: str = ""
+    _section_type: str = ""
+
+    def model_post_init(self, __context: Any) -> None:
+        """Initialize UCI metadata after model creation."""
+        # Subclasses should set these in their __init__
+        pass
+
+    def _get_option_value(self, value: Any) -> str:
+        """Convert Python values to UCI string values."""
         if isinstance(value, bool):
-            value = "1" if value else "0"
+            return "1" if value else "0"
         elif isinstance(value, int):
-            value = str(value)
-        self.options[key] = value
-
-    def add_list_option(self, key: str, value: str) -> None:
-        """Add a value to a list option."""
-        if key not in self.options:
-            self.options[key] = []
-        if isinstance(self.options[key], list):
-            self.options[key].append(value)
+            return str(value)
         else:
-            raise ValueError(f"Option {key} is not a list")
+            return str(value)
 
     def get_commands(self) -> List[UCICommand]:
         """Generate UCI commands for this section."""
@@ -67,36 +66,32 @@ class UCISection:
 
         # Set section type
         commands.append(
-            UCICommand("set", f"{self.package}.{self.section}", self.section_type)
+            UCICommand("set", f"{self._package}.{self._section}", self._section_type)
         )
 
-        # Set all options
-        for key, value in self.options.items():
-            if isinstance(value, list):
-                for item in value:
+        # Get all fields except private ones (starting with _)
+        for field_name, field_value in self.model_dump(exclude_none=True).items():
+            if field_name.startswith("_"):
+                continue
+
+            if isinstance(field_value, list):
+                # Handle list options
+                for item in field_value:
                     commands.append(
-                        UCICommand("add_list", f"{self.package}.{self.section}.{key}", item)
+                        UCICommand(
+                            "add_list",
+                            f"{self._package}.{self._section}.{field_name}",
+                            self._get_option_value(item)
+                        )
                     )
             else:
+                # Handle single-value options
                 commands.append(
-                    UCICommand("set", f"{self.package}.{self.section}.{key}", value)
+                    UCICommand(
+                        "set",
+                        f"{self._package}.{self._section}.{field_name}",
+                        self._get_option_value(field_value)
+                    )
                 )
 
         return commands
-
-
-class BaseBuilder:
-    """Base class for builder pattern implementations."""
-
-    def __init__(self, section: UCISection):
-        self._section = section
-
-    def _set(self, key: str, value: Union[str, int, bool]) -> "BaseBuilder":
-        """Set an option and return self for chaining."""
-        self._section.set_option(key, value)
-        return self
-
-    def _add_list(self, key: str, value: str) -> "BaseBuilder":
-        """Add to a list option and return self for chaining."""
-        self._section.add_list_option(key, value)
-        return self

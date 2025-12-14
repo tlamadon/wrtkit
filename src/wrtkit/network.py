@@ -1,123 +1,158 @@
 """Network configuration components."""
 
-from typing import List
-from .base import UCISection, BaseBuilder, UCICommand
+from typing import List, Optional
+from pydantic import Field
+from .base import UCISection, UCICommand
 
 
 class NetworkDevice(UCISection):
     """Represents a network device configuration."""
 
-    def __init__(self, name: str):
-        super().__init__("network", name, "device")
+    name: Optional[str] = None
+    type: Optional[str] = None
+    ports: List[str] = Field(default_factory=list)
+    ifname: Optional[str] = None
+    vid: Optional[int] = None
+
+    def __init__(self, device_name: str, **data):
+        super().__init__(**data)
+        self._package = "network"
+        self._section = device_name
+        self._section_type = "device"
+
+    # Immutable builder methods (composable)
+    def with_name(self, value: str) -> "NetworkDevice":
+        """Set the device name (returns new copy)."""
+        return self.model_copy(update={"name": value})
+
+    def with_type(self, value: str) -> "NetworkDevice":
+        """Set the device type (e.g., 'bridge', '8021q') (returns new copy)."""
+        return self.model_copy(update={"type": value})
+
+    def with_port(self, port: str) -> "NetworkDevice":
+        """Add a port to the device (returns new copy)."""
+        ports = self.ports.copy()
+        ports.append(port)
+        return self.model_copy(update={"ports": ports})
+
+    def with_ports(self, ports: List[str]) -> "NetworkDevice":
+        """Set all ports for the device (returns new copy)."""
+        return self.model_copy(update={"ports": ports.copy()})
+
+    def with_ifname(self, value: str) -> "NetworkDevice":
+        """Set the interface name (returns new copy)."""
+        return self.model_copy(update={"ifname": value})
+
+    def with_vid(self, value: int) -> "NetworkDevice":
+        """Set the VLAN ID (returns new copy)."""
+        return self.model_copy(update={"vid": value})
 
 
 class NetworkInterface(UCISection):
     """Represents a network interface configuration."""
 
-    def __init__(self, name: str):
-        super().__init__("network", name, "interface")
+    device: Optional[str] = None
+    proto: Optional[str] = None
+    ipaddr: Optional[str] = None
+    netmask: Optional[str] = None
+    gateway: Optional[str] = None
+    master: Optional[str] = None
+    mtu: Optional[int] = None
+    routing_algo: Optional[str] = None
+    gw_mode: Optional[str] = None
+    gw_bandwidth: Optional[str] = None
+    hop_penalty: Optional[int] = None
+    orig_interval: Optional[int] = None
+
+    def __init__(self, interface_name: str, **data):
+        super().__init__(**data)
+        self._package = "network"
+        self._section = interface_name
+        self._section_type = "interface"
+
+    # Immutable builder methods (composable)
+    def with_device(self, value: str) -> "NetworkInterface":
+        """Set the device for this interface (returns new copy)."""
+        return self.model_copy(update={"device": value})
+
+    def with_proto(self, value: str) -> "NetworkInterface":
+        """Set the protocol (e.g., 'static', 'dhcp', 'batadv') (returns new copy)."""
+        return self.model_copy(update={"proto": value})
+
+    def with_ipaddr(self, value: str) -> "NetworkInterface":
+        """Set the IP address (returns new copy)."""
+        return self.model_copy(update={"ipaddr": value})
+
+    def with_netmask(self, value: str) -> "NetworkInterface":
+        """Set the netmask (returns new copy)."""
+        return self.model_copy(update={"netmask": value})
+
+    def with_gateway(self, value: str) -> "NetworkInterface":
+        """Set the gateway (returns new copy)."""
+        return self.model_copy(update={"gateway": value})
+
+    def with_master(self, value: str) -> "NetworkInterface":
+        """Set the master interface (for batman-adv) (returns new copy)."""
+        return self.model_copy(update={"master": value})
+
+    def with_mtu(self, value: int) -> "NetworkInterface":
+        """Set the MTU (returns new copy)."""
+        return self.model_copy(update={"mtu": value})
+
+    def with_routing_algo(self, value: str) -> "NetworkInterface":
+        """Set the routing algorithm (for batman-adv) (returns new copy)."""
+        return self.model_copy(update={"routing_algo": value})
+
+    def with_gw_mode(self, value: str) -> "NetworkInterface":
+        """Set the gateway mode (for batman-adv) (returns new copy)."""
+        return self.model_copy(update={"gw_mode": value})
+
+    def with_gw_bandwidth(self, value: str) -> "NetworkInterface":
+        """Set the gateway bandwidth (for batman-adv) (returns new copy)."""
+        return self.model_copy(update={"gw_bandwidth": value})
+
+    def with_hop_penalty(self, value: int) -> "NetworkInterface":
+        """Set the hop penalty (for batman-adv) (returns new copy)."""
+        return self.model_copy(update={"hop_penalty": value})
+
+    def with_orig_interval(self, value: int) -> "NetworkInterface":
+        """Set the originator interval (for batman-adv) (returns new copy)."""
+        return self.model_copy(update={"orig_interval": value})
+
+    # Convenience builder methods for common configurations
+    def with_static_ip(self, ip: str, netmask: str = "255.255.255.0", gateway: Optional[str] = None) -> "NetworkInterface":
+        """Configure interface with static IP (returns new copy)."""
+        updates = {"proto": "static", "ipaddr": ip, "netmask": netmask}
+        if gateway:
+            updates["gateway"] = gateway
+        return self.model_copy(update=updates)
+
+    def with_dhcp(self) -> "NetworkInterface":
+        """Configure interface to use DHCP (returns new copy)."""
+        return self.model_copy(update={"proto": "dhcp"})
 
 
-class DeviceBuilder(BaseBuilder):
-    """Builder for network devices."""
-
-    def __init__(self, section: NetworkDevice):
-        super().__init__(section)
-
-    def name(self, value: str) -> "DeviceBuilder":
-        """Set the device name."""
-        return self._set("name", value)
-
-    def type(self, value: str) -> "DeviceBuilder":
-        """Set the device type (e.g., 'bridge', '8021q')."""
-        return self._set("type", value)
-
-    def add_port(self, port: str) -> "DeviceBuilder":
-        """Add a port to the device."""
-        return self._add_list("ports", port)
-
-    def ifname(self, value: str) -> "DeviceBuilder":
-        """Set the interface name."""
-        return self._set("ifname", value)
-
-    def vid(self, value: int) -> "DeviceBuilder":
-        """Set the VLAN ID."""
-        return self._set("vid", value)
-
-
-class InterfaceBuilder(BaseBuilder):
-    """Builder for network interfaces."""
-
-    def __init__(self, section: NetworkInterface):
-        super().__init__(section)
-
-    def device(self, value: str) -> "InterfaceBuilder":
-        """Set the device for this interface."""
-        return self._set("device", value)
-
-    def proto(self, value: str) -> "InterfaceBuilder":
-        """Set the protocol (e.g., 'static', 'dhcp', 'batadv')."""
-        return self._set("proto", value)
-
-    def ipaddr(self, value: str) -> "InterfaceBuilder":
-        """Set the IP address."""
-        return self._set("ipaddr", value)
-
-    def netmask(self, value: str) -> "InterfaceBuilder":
-        """Set the netmask."""
-        return self._set("netmask", value)
-
-    def gateway(self, value: str) -> "InterfaceBuilder":
-        """Set the gateway."""
-        return self._set("gateway", value)
-
-    def master(self, value: str) -> "InterfaceBuilder":
-        """Set the master interface (for batman-adv)."""
-        return self._set("master", value)
-
-    def mtu(self, value: int) -> "InterfaceBuilder":
-        """Set the MTU."""
-        return self._set("mtu", value)
-
-    def routing_algo(self, value: str) -> "InterfaceBuilder":
-        """Set the routing algorithm (for batman-adv)."""
-        return self._set("routing_algo", value)
-
-    def gw_mode(self, value: str) -> "InterfaceBuilder":
-        """Set the gateway mode (for batman-adv)."""
-        return self._set("gw_mode", value)
-
-    def gw_bandwidth(self, value: str) -> "InterfaceBuilder":
-        """Set the gateway bandwidth (for batman-adv)."""
-        return self._set("gw_bandwidth", value)
-
-    def hop_penalty(self, value: int) -> "InterfaceBuilder":
-        """Set the hop penalty (for batman-adv)."""
-        return self._set("hop_penalty", value)
-
-    def orig_interval(self, value: int) -> "InterfaceBuilder":
-        """Set the originator interval (for batman-adv)."""
-        return self._set("orig_interval", value)
-
-
-class NetworkConfig:
+class NetworkConfig(UCISection):
     """Network configuration manager."""
 
-    def __init__(self) -> None:
-        self.devices: List[NetworkDevice] = []
-        self.interfaces: List[NetworkInterface] = []
+    devices: List[NetworkDevice] = Field(default_factory=list)
+    interfaces: List[NetworkInterface] = Field(default_factory=list)
 
-    def device(self, name: str) -> DeviceBuilder:
-        """Create a new network device."""
-        dev = NetworkDevice(name)
-        self.devices.append(dev)
-        return DeviceBuilder(dev)
+    def __init__(self, **data):
+        super().__init__(**data)
+        self._package = "network"
+        self._section = ""
+        self._section_type = ""
 
-    def interface(self, name: str) -> InterfaceBuilder:
-        """Create a new network interface."""
-        iface = NetworkInterface(name)
-        self.interfaces.append(iface)
-        return InterfaceBuilder(iface)
+    def add_device(self, device: NetworkDevice) -> "NetworkConfig":
+        """Add a device and return self for chaining."""
+        self.devices.append(device)
+        return self
+
+    def add_interface(self, interface: NetworkInterface) -> "NetworkConfig":
+        """Add an interface and return self for chaining."""
+        self.interfaces.append(interface)
+        return self
 
     def get_commands(self) -> List[UCICommand]:
         """Get all UCI commands for network configuration."""

@@ -1,14 +1,20 @@
 """Tests for network configuration."""
 
 import pytest
-from wrtkit.network import NetworkConfig
+from wrtkit.network import NetworkConfig, NetworkDevice, NetworkInterface
 from wrtkit.base import UCICommand
 
 
 def test_device_creation():
     """Test creating a network device."""
     net = NetworkConfig()
-    net.device("br_lan").name("br-lan").type("bridge").add_port("lan1").add_port("lan2")
+    device = NetworkDevice("br_lan")\
+        .with_name("br-lan")\
+        .with_type("bridge")\
+        .with_port("lan1")\
+        .with_port("lan2")
+
+    net.add_device(device)
 
     commands = net.get_commands()
     assert len(commands) == 5  # type, name, type, port1, port2
@@ -21,9 +27,13 @@ def test_device_creation():
 def test_interface_creation():
     """Test creating a network interface."""
     net = NetworkConfig()
-    net.interface("lan").device("br-lan").proto("static").ipaddr("192.168.1.1").netmask(
-        "255.255.255.0"
-    )
+    interface = NetworkInterface("lan")\
+        .with_device("br-lan")\
+        .with_proto("static")\
+        .with_ipaddr("192.168.1.1")\
+        .with_netmask("255.255.255.0")
+
+    net.add_interface(interface)
 
     commands = net.get_commands()
     assert len(commands) == 5
@@ -38,9 +48,15 @@ def test_interface_creation():
 def test_batadv_interface():
     """Test creating a batman-adv interface."""
     net = NetworkConfig()
-    net.interface("bat0").proto("batadv").routing_algo("BATMAN_IV").gw_mode(
-        "server"
-    ).gw_bandwidth("10000/10000").hop_penalty(30).orig_interval(1000)
+    interface = NetworkInterface("bat0")\
+        .with_proto("batadv")\
+        .with_routing_algo("BATMAN_IV")\
+        .with_gw_mode("server")\
+        .with_gw_bandwidth("10000/10000")\
+        .with_hop_penalty(30)\
+        .with_orig_interval(1000)
+
+    net.add_interface(interface)
 
     commands = net.get_commands()
 
@@ -52,7 +68,13 @@ def test_batadv_interface():
 def test_vlan_device():
     """Test creating a VLAN device."""
     net = NetworkConfig()
-    net.device("bat0_vlan10").type("8021q").ifname("bat0").vid(10).name("bat0.10")
+    device = NetworkDevice("bat0_vlan10")\
+        .with_type("8021q")\
+        .with_ifname("bat0")\
+        .with_vid(10)\
+        .with_name("bat0.10")
+
+    net.add_device(device)
 
     commands = net.get_commands()
 

@@ -35,6 +35,39 @@ Run with:
 python examples/router_config.py
 ```
 
+### diff_demo.py
+
+An interactive demonstration of the enhanced diff functionality, showing:
+- Linear vs tree-structured diff output formats
+- Tracking remote-only UCI settings (not managed by your config)
+- Hierarchical grouping by package and resource type
+- Different types of changes: add, modify, and remote-only
+- How to interpret diff symbols: `+`, `~`, and `*`
+
+Run with:
+```bash
+python examples/diff_demo.py
+```
+
+### serial_example.py
+
+Demonstrates how to use WRTKit with a serial console connection instead of SSH:
+- Connecting to OpenWRT via serial port (e.g., /dev/ttyUSB0)
+- Compatible with picocom, minicom, and other serial console tools
+- Performing diff and apply operations over serial
+- Handling login prompts and shell detection
+- Connection troubleshooting tips
+
+Run with:
+```bash
+python examples/serial_example.py
+
+# Or test connection only:
+python examples/serial_example.py test
+```
+
+**Note:** Make sure no other program is using the serial port, and you have permission to access it (add your user to the `dialout` group on Linux).
+
 ## Usage Patterns
 
 ### 1. Generate Configuration Scripts
@@ -56,8 +89,17 @@ config = UCIConfig()
 # ... configure your settings ...
 
 ssh = SSHConnection(host="192.168.1.1", username="root", password="secret")
+
+# Linear format (default)
 diff = config.diff(ssh)
-print(diff)
+print(str(diff))
+
+# Tree format (grouped by package and resource)
+print(diff.to_tree())
+
+# Control remote-only setting tracking
+diff = config.diff(ssh, show_remote_only=True)  # Track unmanaged settings (default)
+diff = config.diff(ssh, show_remote_only=False)  # Treat as settings to remove
 ```
 
 ### 3. Apply Configuration to Remote Device

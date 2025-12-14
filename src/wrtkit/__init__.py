@@ -1,26 +1,28 @@
-"""WRTKit - A Python library for managing OpenWRT configuration over SSH."""
+"""WRTKit - A Python library for managing OpenWRT configuration over SSH and serial."""
 
 from .config import UCIConfig
 from .ssh import SSHConnection
-from .network import NetworkConfig, DeviceBuilder, InterfaceBuilder
-from .wireless import WirelessConfig, RadioBuilder, WiFiInterfaceBuilder
-from .dhcp import DHCPConfig, DHCPBuilder
-from .firewall import FirewallConfig, ZoneBuilder, ForwardingBuilder
+from .serial import SerialConnection
+from .network import NetworkConfig, NetworkDevice, NetworkInterface
+from .wireless import WirelessConfig, WirelessRadio, WirelessInterface
+from .dhcp import DHCPConfig, DHCPSection
+from .firewall import FirewallConfig, FirewallZone, FirewallForwarding
 
 __version__ = "0.1.0"
 
 __all__ = [
     "UCIConfig",
     "SSHConnection",
+    "SerialConnection",
     "NetworkConfig",
-    "DeviceBuilder",
-    "InterfaceBuilder",
+    "NetworkDevice",
+    "NetworkInterface",
     "WirelessConfig",
-    "RadioBuilder",
-    "WiFiInterfaceBuilder",
+    "WirelessRadio",
+    "WirelessInterface",
     "DHCPConfig",
-    "DHCPBuilder",
+    "DHCPSection",
     "FirewallConfig",
-    "ZoneBuilder",
-    "ForwardingBuilder",
+    "FirewallZone",
+    "FirewallForwarding",
 ]
