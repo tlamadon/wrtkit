@@ -24,7 +24,7 @@ class Colors:
 class ConfigDiff:
     """Represents the difference between two configurations."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.to_add: List[UCICommand] = []
         self.to_remove: List[UCICommand] = []
         self.to_modify: List[tuple[UCICommand, UCICommand]] = []
@@ -194,7 +194,7 @@ class ConfigDiff:
             modify_grouped[package][section].append((old_cmd, new_cmd))
 
         # Get all packages involved
-        all_packages = set()
+        all_packages: set[str] = set()
         all_packages.update(add_grouped.keys())
         all_packages.update(remove_grouped.keys())
         all_packages.update(modify_grouped.keys())
@@ -205,7 +205,7 @@ class ConfigDiff:
             lines.append(f"\n{pkg_color}{package}/{reset}")
 
             # Get all sections in this package
-            sections = set()
+            sections: set[str] = set()
             if package in add_grouped:
                 sections.update(add_grouped[package].keys())
             if package in remove_grouped:
@@ -272,7 +272,7 @@ class ConfigDiff:
 class UCIConfig:
     """Main UCI configuration class."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.network = NetworkConfig()
         self.wireless = WirelessConfig()
         self.dhcp = DHCPConfig()

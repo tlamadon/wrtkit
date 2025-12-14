@@ -1,6 +1,6 @@
 """Wireless configuration components."""
 
-from typing import List, Optional
+from typing import Any, List, Optional
 from pydantic import Field
 from .base import UCISection, UCICommand
 
@@ -14,7 +14,7 @@ class WirelessRadio(UCISection):
     disabled: Optional[bool] = None
     txpower: Optional[int] = None
 
-    def __init__(self, radio_name: str, **data):
+    def __init__(self, radio_name: str, **data: Any) -> None:
         super().__init__(**data)
         self._package = "wireless"
         self._section = radio_name
@@ -59,7 +59,7 @@ class WirelessInterface(UCISection):
     ft_over_ds: Optional[bool] = None
     ft_psk_generate_local: Optional[bool] = None
 
-    def __init__(self, iface_name: str, **data):
+    def __init__(self, iface_name: str, **data: Any) -> None:
         super().__init__(**data)
         self._package = "wireless"
         self._section = iface_name
@@ -140,7 +140,7 @@ class WirelessConfig(UCISection):
     radios: List[WirelessRadio] = Field(default_factory=list)
     interfaces: List[WirelessInterface] = Field(default_factory=list)
 
-    def __init__(self, **data):
+    def __init__(self, **data: Any) -> None:
         super().__init__(**data)
         self._package = "wireless"
         self._section = ""

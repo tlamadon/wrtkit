@@ -1,6 +1,6 @@
 """Firewall configuration components."""
 
-from typing import List, Optional
+from typing import Any, List, Optional
 from pydantic import Field
 from .base import UCISection, UCICommand
 
@@ -16,7 +16,7 @@ class FirewallZone(UCISection):
     mtu_fix: Optional[bool] = None
     network: List[str] = Field(default_factory=list)
 
-    def __init__(self, index: int, **data):
+    def __init__(self, index: int, **data: Any) -> None:
         super().__init__(**data)
         self._package = "firewall"
         self._section = f"@zone[{index}]"
@@ -70,7 +70,7 @@ class FirewallForwarding(UCISection):
     src: Optional[str] = None
     dest: Optional[str] = None
 
-    def __init__(self, index: int, **data):
+    def __init__(self, index: int, **data: Any) -> None:
         super().__init__(**data)
         self._package = "firewall"
         self._section = f"@forwarding[{index}]"
@@ -93,7 +93,7 @@ class FirewallConfig(UCISection):
     zones: List[FirewallZone] = Field(default_factory=list)
     forwardings: List[FirewallForwarding] = Field(default_factory=list)
 
-    def __init__(self, **data):
+    def __init__(self, **data: Any) -> None:
         super().__init__(**data)
         self._package = "firewall"
         self._section = ""

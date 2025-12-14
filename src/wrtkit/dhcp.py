@@ -1,6 +1,6 @@
 """DHCP configuration components."""
 
-from typing import List, Optional
+from typing import Any, List, Optional
 from pydantic import Field
 from .base import UCISection, UCICommand
 
@@ -14,7 +14,7 @@ class DHCPSection(UCISection):
     leasetime: Optional[str] = None
     ignore: Optional[bool] = None
 
-    def __init__(self, dhcp_name: str, **data):
+    def __init__(self, dhcp_name: str, **data: Any) -> None:
         super().__init__(**data)
         self._package = "dhcp"
         self._section = dhcp_name
@@ -52,7 +52,7 @@ class DHCPConfig(UCISection):
 
     sections: List[DHCPSection] = Field(default_factory=list)
 
-    def __init__(self, **data):
+    def __init__(self, **data: Any) -> None:
         super().__init__(**data)
         self._package = "dhcp"
         self._section = ""

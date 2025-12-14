@@ -1,6 +1,6 @@
 """Network configuration components."""
 
-from typing import List, Optional
+from typing import Any, List, Optional
 from pydantic import Field
 from .base import UCISection, UCICommand
 
@@ -14,7 +14,7 @@ class NetworkDevice(UCISection):
     ifname: Optional[str] = None
     vid: Optional[int] = None
 
-    def __init__(self, device_name: str, **data):
+    def __init__(self, device_name: str, **data: Any) -> None:
         super().__init__(**data)
         self._package = "network"
         self._section = device_name
@@ -64,7 +64,7 @@ class NetworkInterface(UCISection):
     hop_penalty: Optional[int] = None
     orig_interval: Optional[int] = None
 
-    def __init__(self, interface_name: str, **data):
+    def __init__(self, interface_name: str, **data: Any) -> None:
         super().__init__(**data)
         self._package = "network"
         self._section = interface_name
@@ -138,7 +138,7 @@ class NetworkConfig(UCISection):
     devices: List[NetworkDevice] = Field(default_factory=list)
     interfaces: List[NetworkInterface] = Field(default_factory=list)
 
-    def __init__(self, **data):
+    def __init__(self, **data: Any) -> None:
         super().__init__(**data)
         self._package = "network"
         self._section = ""
