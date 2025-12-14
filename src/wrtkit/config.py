@@ -1,6 +1,8 @@
 """Main UCI configuration class."""
 
-from typing import List, Dict
+import json
+import yaml
+from typing import List, Dict, Any
 from .base import UCICommand
 from .network import NetworkConfig, NetworkInterface, NetworkDevice
 from .wireless import WirelessConfig, WirelessRadio, WirelessInterface
@@ -574,3 +576,348 @@ class UCIConfig:
         script = self.to_script(include_commit=include_commit, include_reload=include_reload)
         with open(filename, "w") as f:
             f.write(script)
+
+    # YAML/JSON Schema generation
+    @classmethod
+    def json_schema(cls, title: str = "UCI Configuration Schema") -> Dict[str, Any]:
+        """
+        Generate JSON Schema for the complete UCI configuration.
+
+        Args:
+            title: Title for the schema
+
+        Returns:
+            JSON Schema as a dictionary
+        """
+        return {
+            "title": title,
+            "type": "object",
+            "properties": {
+                "network": {
+                    "type": "object",
+                    "properties": {
+                        "devices": {
+                            "type": "object",
+                            "additionalProperties": NetworkDevice.json_schema()
+                        },
+                        "interfaces": {
+                            "type": "object",
+                            "additionalProperties": NetworkInterface.json_schema()
+                        }
+                    }
+                },
+                "wireless": {
+                    "type": "object",
+                    "properties": {
+                        "radios": {
+                            "type": "object",
+                            "additionalProperties": WirelessRadio.json_schema()
+                        },
+                        "interfaces": {
+                            "type": "object",
+                            "additionalProperties": WirelessInterface.json_schema()
+                        }
+                    }
+                },
+                "dhcp": {
+                    "type": "object",
+                    "properties": {
+                        "sections": {
+                            "type": "object",
+                            "additionalProperties": DHCPSection.json_schema()
+                        }
+                    }
+                },
+                "firewall": {
+                    "type": "object",
+                    "properties": {
+                        "zones": {
+                            "type": "object",
+                            "additionalProperties": FirewallZone.json_schema()
+                        },
+                        "forwardings": {
+                            "type": "array",
+                            "items": FirewallForwarding.json_schema()
+                        }
+                    }
+                }
+            }
+        }
+
+    @classmethod
+    def yaml_schema(cls, title: str = "UCI Configuration Schema") -> str:
+        """
+        Generate YAML Schema for the complete UCI configuration.
+
+        Args:
+            title: Title for the schema
+
+        Returns:
+            JSON Schema in YAML format as a string
+        """
+        schema = cls.json_schema(title)
+        return yaml.dump(schema, default_flow_style=False, sort_keys=False)
+
+    # Serialization methods
+    def to_dict(self, exclude_none: bool = True) -> Dict[str, Any]:
+        """
+        Convert the configuration to a dictionary.
+
+        Args:
+            exclude_none: Whether to exclude None values
+
+        Returns:
+            Dictionary representation of the configuration
+        """
+        result: Dict[str, Any] = {}
+
+        # Network configuration
+        if self.network.devices or self.network.interfaces:
+            network_dict: Dict[str, Any] = {}
+
+            if self.network.devices:
+                devices_dict = {}
+                for device in self.network.devices:
+                    devices_dict[device._section] = device.to_dict(exclude_none=exclude_none)
+                network_dict["devices"] = devices_dict
+
+            if self.network.interfaces:
+                interfaces_dict = {}
+                for interface in self.network.interfaces:
+                    interfaces_dict[interface._section] = interface.to_dict(exclude_none=exclude_none)
+                network_dict["interfaces"] = interfaces_dict
+
+            result["network"] = network_dict
+
+        # Wireless configuration
+        if self.wireless.radios or self.wireless.interfaces:
+            wireless_dict: Dict[str, Any] = {}
+
+            if self.wireless.radios:
+                radios_dict = {}
+                for radio in self.wireless.radios:
+                    radios_dict[radio._section] = radio.to_dict(exclude_none=exclude_none)
+                wireless_dict["radios"] = radios_dict
+
+            if self.wireless.interfaces:
+                interfaces_dict = {}
+                for iface in self.wireless.interfaces:
+                    interfaces_dict[iface._section] = iface.to_dict(exclude_none=exclude_none)
+                wireless_dict["interfaces"] = interfaces_dict
+
+            result["wireless"] = wireless_dict
+
+        # DHCP configuration
+        if self.dhcp.sections:
+            dhcp_dict: Dict[str, Any] = {}
+            sections_dict = {}
+            for section in self.dhcp.sections:
+                sections_dict[section._section] = section.to_dict(exclude_none=exclude_none)
+            dhcp_dict["sections"] = sections_dict
+            result["dhcp"] = dhcp_dict
+
+        # Firewall configuration
+        if self.firewall.zones or self.firewall.forwardings:
+            firewall_dict: Dict[str, Any] = {}
+
+            if self.firewall.zones:
+                zones_dict = {}
+                for zone in self.firewall.zones:
+                    zone_name = zone.name or f"zone_{zone.index}"
+                    zones_dict[zone_name] = zone.to_dict(exclude_none=exclude_none)
+                firewall_dict["zones"] = zones_dict
+
+            if self.firewall.forwardings:
+                forwardings_list = []
+                for forwarding in self.firewall.forwardings:
+                    forwardings_list.append(forwarding.to_dict(exclude_none=exclude_none))
+                firewall_dict["forwardings"] = forwardings_list
+
+            result["firewall"] = firewall_dict
+
+        return result
+
+    def to_json(self, indent: int = 2, exclude_none: bool = True) -> str:
+        """
+        Convert the configuration to JSON string.
+
+        Args:
+            indent: Indentation level for pretty printing
+            exclude_none: Whether to exclude None values
+
+        Returns:
+            JSON string representation
+        """
+        data = self.to_dict(exclude_none=exclude_none)
+        return json.dumps(data, indent=indent)
+
+    def to_yaml(self, exclude_none: bool = True) -> str:
+        """
+        Convert the configuration to YAML string.
+
+        Args:
+            exclude_none: Whether to exclude None values
+
+        Returns:
+            YAML string representation
+        """
+        data = self.to_dict(exclude_none=exclude_none)
+        return yaml.dump(data, default_flow_style=False, sort_keys=False)
+
+    def to_json_file(self, filename: str, indent: int = 2, exclude_none: bool = True) -> None:
+        """
+        Save the configuration to a JSON file.
+
+        Args:
+            filename: Path to output file
+            indent: Indentation level for pretty printing
+            exclude_none: Whether to exclude None values
+        """
+        json_str = self.to_json(indent=indent, exclude_none=exclude_none)
+        with open(filename, 'w') as f:
+            f.write(json_str)
+
+    def to_yaml_file(self, filename: str, exclude_none: bool = True) -> None:
+        """
+        Save the configuration to a YAML file.
+
+        Args:
+            filename: Path to output file
+            exclude_none: Whether to exclude None values
+        """
+        yaml_str = self.to_yaml(exclude_none=exclude_none)
+        with open(filename, 'w') as f:
+            f.write(yaml_str)
+
+    # Deserialization methods
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "UCIConfig":
+        """
+        Create a UCIConfig instance from a dictionary.
+
+        Args:
+            data: Dictionary containing the configuration
+
+        Returns:
+            UCIConfig instance
+        """
+        config = cls()
+
+        # Load network configuration
+        if "network" in data:
+            network_data = data["network"]
+
+            if "devices" in network_data:
+                for section_name, device_data in network_data["devices"].items():
+                    device = NetworkDevice(section_name, **device_data)
+                    config.network.add_device(device)
+
+            if "interfaces" in network_data:
+                for section_name, interface_data in network_data["interfaces"].items():
+                    interface = NetworkInterface(section_name, **interface_data)
+                    config.network.add_interface(interface)
+
+        # Load wireless configuration
+        if "wireless" in data:
+            wireless_data = data["wireless"]
+
+            if "radios" in wireless_data:
+                for section_name, radio_data in wireless_data["radios"].items():
+                    radio = WirelessRadio(section_name, **radio_data)
+                    config.wireless.add_radio(radio)
+
+            if "interfaces" in wireless_data:
+                for section_name, interface_data in wireless_data["interfaces"].items():
+                    interface = WirelessInterface(section_name, **interface_data)
+                    config.wireless.add_interface(interface)
+
+        # Load DHCP configuration
+        if "dhcp" in data:
+            dhcp_data = data["dhcp"]
+
+            if "sections" in dhcp_data:
+                for section_name, section_data in dhcp_data["sections"].items():
+                    section = DHCPSection(section_name, **section_data)
+                    config.dhcp.add_dhcp(section)
+
+        # Load firewall configuration
+        if "firewall" in data:
+            firewall_data = data["firewall"]
+
+            if "zones" in firewall_data:
+                for idx, (zone_name, zone_data) in enumerate(firewall_data["zones"].items()):
+                    # Make a copy to avoid modifying original data
+                    zone_data = zone_data.copy()
+                    # Set the name from the key if not already in data
+                    if "name" not in zone_data:
+                        zone_data["name"] = zone_name
+                    # Remove index from data if present (it's passed as constructor arg)
+                    zone_data.pop("index", None)
+                    zone = FirewallZone(idx, **zone_data)
+                    config.firewall.add_zone(zone)
+
+            if "forwardings" in firewall_data:
+                for idx, forwarding_data in enumerate(firewall_data["forwardings"]):
+                    # Make a copy and remove index
+                    forwarding_data = forwarding_data.copy()
+                    forwarding_data.pop("index", None)
+                    forwarding = FirewallForwarding(idx, **forwarding_data)
+                    config.firewall.add_forwarding(forwarding)
+
+        return config
+
+    @classmethod
+    def from_json(cls, json_str: str) -> "UCIConfig":
+        """
+        Create a UCIConfig instance from JSON string.
+
+        Args:
+            json_str: JSON string
+
+        Returns:
+            UCIConfig instance
+        """
+        data = json.loads(json_str)
+        return cls.from_dict(data)
+
+    @classmethod
+    def from_yaml(cls, yaml_str: str) -> "UCIConfig":
+        """
+        Create a UCIConfig instance from YAML string.
+
+        Args:
+            yaml_str: YAML string
+
+        Returns:
+            UCIConfig instance
+        """
+        data = yaml.safe_load(yaml_str)
+        return cls.from_dict(data)
+
+    @classmethod
+    def from_json_file(cls, filename: str) -> "UCIConfig":
+        """
+        Create a UCIConfig instance from JSON file.
+
+        Args:
+            filename: Path to JSON file
+
+        Returns:
+            UCIConfig instance
+        """
+        with open(filename, 'r') as f:
+            return cls.from_json(f.read())
+
+    @classmethod
+    def from_yaml_file(cls, filename: str) -> "UCIConfig":
+        """
+        Create a UCIConfig instance from YAML file.
+
+        Args:
+            filename: Path to YAML file
+
+        Returns:
+            UCIConfig instance
+        """
+        with open(filename, 'r') as f:
+            return cls.from_yaml(f.read())

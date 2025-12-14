@@ -5,6 +5,10 @@ A Python library for managing OpenWRT configuration over SSH and serial console 
 ## Features
 
 - **Composable Configuration**: Define OpenWRT configurations using type-safe Pydantic models with immutable builder patterns
+- **YAML/JSON Support**: Load and save configurations in YAML or JSON format
+  - Generate JSON/YAML schemas for IDE autocomplete and validation
+  - Permissive schema accepts custom UCI options
+  - Serialize and deserialize individual sections or complete configs
 - **Multiple Connection Types**:
   - SSH connections (via paramiko)
   - Serial console connections (via pyserial) - works with picocom, minicom, etc.
@@ -89,6 +93,153 @@ print(diff.to_tree())
 if input("Apply changes? (y/n): ") == "y":
     config.apply(ssh)
 ```
+
+## YAML/JSON Configuration
+
+Load and save configurations in YAML or JSON format for better readability and version control:
+
+### Load Configuration from YAML
+
+```python
+from wrtkit import UCIConfig
+
+# Load complete configuration from YAML file
+config = UCIConfig.from_yaml_file("router-config.yaml")
+
+# Apply to device
+with SSHConnection("192.168.1.1", username="root", password="pass") as ssh:
+    config.apply(ssh)
+```
+
+### Save Configuration to YAML/JSON
+
+```python
+# Build configuration programmatically
+config = UCIConfig()
+# ... add interfaces, radios, etc ...
+
+# Save to YAML
+config.to_yaml_file("my-config.yaml")
+
+# Save to JSON
+config.to_json_file("my-config.json")
+```
+
+### Example YAML Configuration
+
+```yaml
+network:
+  devices:
+    br_lan:
+      name: br-lan
+      type: bridge
+      ports:
+        - lan1
+        - lan2
+  interfaces:
+    lan:
+      device: br-lan
+      proto: static
+      ipaddr: 192.168.1.1
+      netmask: 255.255.255.0
+
+wireless:
+  radios:
+    radio0:
+      channel: 36
+      htmode: HE80
+      country: US
+  interfaces:
+    default_radio0:
+      device: radio0
+      mode: ap
+      network: lan
+      ssid: MyNetwork
+      encryption: sae
+      key: SecurePassword123!
+
+dhcp:
+  sections:
+    lan:
+      interface: lan
+      start: 100
+      limit: 150
+      leasetime: 12h
+```
+
+### Generate Schemas
+
+Generate JSON/YAML schemas for IDE autocomplete and validation:
+
+```python
+from wrtkit import UCIConfig
+from wrtkit.network import NetworkInterface
+
+# Generate complete config schema
+schema = UCIConfig.json_schema()
+
+# Generate schema for individual section types
+interface_schema = NetworkInterface.json_schema()
+
+# Save schema to file
+with open("schemas/uci-config-schema.json", "w") as f:
+    import json
+    json.dump(schema, f, indent=2)
+```
+
+### Hybrid Workflow: Mix YAML and Python
+
+Combine the best of both approaches:
+
+```python
+from wrtkit import UCIConfig
+from wrtkit.network import NetworkInterface
+
+# Start with a YAML template for static configuration
+config = UCIConfig.from_yaml_file("base-config.yaml")
+
+# Add dynamic interfaces programmatically
+for vlan_id in [10, 20, 30]:
+    guest = NetworkInterface(f"guest{vlan_id}") \
+        .with_device(f"lan1.{vlan_id}") \
+        .with_static_ip(f"192.168.{vlan_id}.1", "255.255.255.0")
+    config.network.add_interface(guest)
+
+# Save the merged configuration
+config.to_yaml_file("final-config.yaml")
+
+# Or apply directly to device
+with SSHConnection("192.168.1.1", username="root", password="pass") as ssh:
+    diff = config.diff(ssh)
+    if not diff.is_empty():
+        print(diff.to_tree())
+        config.apply(ssh)
+```
+
+### Configuration as Code: Version Control
+
+Track your router configurations in git:
+
+```bash
+# Create router configs directory
+mkdir -p configs/production configs/staging
+
+# Export your configurations
+python -c "
+from wrtkit import UCIConfig
+# ... build config ...
+config.to_yaml_file('configs/production/router-01.yaml')
+"
+
+# Track in git
+git add configs/
+git commit -m "Add production router configuration"
+
+# Review changes
+git diff HEAD~1 configs/production/router-01.yaml
+```
+
+For detailed documentation on YAML/JSON features, see [docs/yaml-json-guide.md](docs/yaml-json-guide.md).
 
 ## Composable Builder Pattern
 
@@ -360,8 +511,93 @@ lan_copy = NetworkInterface.model_validate(config_dict)
 ## Examples
 
 Check out the [examples](examples/) directory for:
+
+### Python Examples
 - [simple_example.py](examples/simple_example.py) - Basic router setup
 - [router_config.py](examples/router_config.py) - Advanced mesh network configuration
+- [serial_example.py](examples/serial_example.py) - Serial console configuration
+
+### YAML/JSON Examples
+- [router-config.yaml](examples/router-config.yaml) - Complete router configuration in YAML
+- [router-config.json](examples/router-config.json) - Complete router configuration in JSON
+- [network-interface.yaml](examples/network-interface.yaml) - Individual network interface
+- [wireless-ap.yaml](examples/wireless-ap.yaml) - Wireless access point configuration
+
+### Practical Use Cases
+
+#### Multi-VLAN Guest Networks
+```python
+from wrtkit import UCIConfig
+from wrtkit.network import NetworkDevice, NetworkInterface
+from wrtkit.dhcp import DHCPSection
+
+config = UCIConfig()
+
+# Create VLANs for different guest networks
+for vlan_id, network_name in [(10, "guest-staff"), (20, "guest-iot"), (30, "guest-public")]:
+    # VLAN device
+    vlan = NetworkDevice(f"vlan_{vlan_id}") \
+        .with_type("8021q") \
+        .with_ifname("lan1") \
+        .with_vid(vlan_id)
+    config.network.add_device(vlan)
+
+    # Interface
+    interface = NetworkInterface(network_name) \
+        .with_device(f"lan1.{vlan_id}") \
+        .with_static_ip(f"192.168.{vlan_id}.1", "255.255.255.0")
+    config.network.add_interface(interface)
+
+    # DHCP
+    dhcp = DHCPSection(network_name) \
+        .with_interface(network_name) \
+        .with_range(100, 150, "2h")
+    config.dhcp.add_dhcp(dhcp)
+
+# Save or apply
+config.to_yaml_file("guest-networks.yaml")
+```
+
+#### Mesh Network Deployment
+```python
+from wrtkit import UCIConfig
+from wrtkit.wireless import WirelessRadio, WirelessInterface
+
+# Load base config from YAML
+config = UCIConfig.from_yaml_file("mesh-base.yaml")
+
+# Configure mesh on both radios
+for radio_id in ["radio0", "radio1"]:
+    mesh = WirelessInterface(f"mesh_{radio_id}") \
+        .with_device(radio_id) \
+        .with_mesh(
+            mesh_id="MyMeshNetwork",
+            network="bat0",
+            encryption="sae",
+            key="SecureMeshKey123!"
+        )
+    config.wireless.add_interface(mesh)
+
+config.to_yaml_file("mesh-node.yaml")
+```
+
+#### Configuration Migration
+```python
+from wrtkit import UCIConfig
+
+# Load old JSON config
+old_config = UCIConfig.from_json_file("old-router.json")
+
+# Migrate to new structure (modify as needed)
+# ... make changes ...
+
+# Export to YAML for better readability
+old_config.to_yaml_file("migrated-router.yaml")
+
+# Validate by generating UCI commands
+commands = old_config.get_all_commands()
+print(f"Generated {len(commands)} UCI commands")
+```
 
 ## Development
 

@@ -1,0 +1,110 @@
+network:
+  devices:
+    br_lan:
+      name: br-lan
+      type: bridge
+      ports:
+      - lan1
+      - lan2
+      - lan3
+      - lan4
+    guest_vlan:
+      type: 8021q
+      ports: []
+      ifname: lan1
+      vid: 100
+  interfaces:
+    lan:
+      device: br-lan
+      proto: static
+      ipaddr: 192.168.1.1
+      netmask: 255.255.255.0
+    wan:
+      device: eth0
+      proto: dhcp
+    guest:
+      device: lan1.100
+      proto: static
+      ipaddr: 192.168.100.1
+      netmask: 255.255.255.0
+wireless:
+  radios:
+    radio0:
+      channel: 36
+      htmode: HE80
+      country: US
+      disabled: false
+    radio1:
+      channel: 6
+      htmode: HE20
+      country: US
+      disabled: false
+  interfaces:
+    guest_radio1:
+      device: radio1
+      mode: ap
+      network: guest
+      ssid: GuestNetwork
+      encryption: psk2
+      key: GuestPassword123!
+    main_5g:
+      device: radio0
+      mode: ap
+      network: lan
+      ssid: MyNetwork-5G
+      encryption: sae
+      key: SecurePassword123!
+    main_2g:
+      device: radio1
+      mode: ap
+      network: lan
+      ssid: MyNetwork-2.4G
+      encryption: sae
+      key: SecurePassword123!
+dhcp:
+  sections:
+    lan:
+      interface: lan
+      start: 100
+      limit: 200
+      leasetime: 12h
+    guest:
+      interface: guest
+      start: 50
+      limit: 100
+      leasetime: 2h
+firewall:
+  zones:
+    lan:
+      name: lan
+      input: ACCEPT
+      output: ACCEPT
+      forward: ACCEPT
+      network:
+      - lan
+      index: 0
+    wan:
+      name: wan
+      input: REJECT
+      output: ACCEPT
+      forward: REJECT
+      masq: true
+      mtu_fix: true
+      network:
+      - wan
+      index: 1
+    guest:
+      name: guest
+      input: REJECT
+      output: ACCEPT
+      forward: REJECT
+      network:
+      - guest
+      index: 2
+  forwardings:
+  - src: lan
+    dest: wan
+    index: 0
+  - src: guest
+    dest: wan
+    index: 1

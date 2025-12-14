@@ -1,0 +1,145 @@
+# Complete Router Configuration Example
+# This file demonstrates all available configuration options in YAML format
+
+network:
+  devices:
+    br_lan:
+      name: br-lan
+      type: bridge
+      ports:
+        - lan1
+        - lan2
+        - lan3
+        - lan4
+
+    vlan_guest:
+      type: 8021q
+      ifname: lan1
+      vid: 100
+
+  interfaces:
+    loopback:
+      device: lo
+      proto: static
+      ipaddr: 127.0.0.1
+      netmask: 255.0.0.0
+
+    lan:
+      device: br-lan
+      proto: static
+      ipaddr: 192.168.1.1
+      netmask: 255.255.255.0
+
+    wan:
+      device: eth0
+      proto: dhcp
+
+    guest:
+      device: lan1.100
+      proto: static
+      ipaddr: 192.168.100.1
+      netmask: 255.255.255.0
+
+    mesh_bat:
+      proto: batadv
+      master: bat0
+      routing_algo: BATMAN_IV
+      gw_mode: server
+      gw_bandwidth: 10000/2000
+
+wireless:
+  radios:
+    radio0:
+      channel: 36
+      htmode: HE80
+      country: US
+      txpower: 20
+      disabled: false
+
+    radio1:
+      channel: 6
+      htmode: HE20
+      country: US
+      txpower: 20
+      disabled: false
+
+  interfaces:
+    default_radio0:
+      device: radio0
+      mode: ap
+      network: lan
+      ssid: MyNetwork-5G
+      encryption: sae
+      key: SecurePassword123!
+
+    default_radio1:
+      device: radio1
+      mode: ap
+      network: lan
+      ssid: MyNetwork-2.4G
+      encryption: sae
+      key: SecurePassword123!
+
+    guest_radio1:
+      device: radio1
+      mode: ap
+      network: guest
+      ssid: GuestNetwork
+      encryption: psk2
+      key: GuestPassword123!
+
+    mesh_radio0:
+      device: radio0
+      mode: mesh
+      network: mesh_bat
+      mesh_id: MyMeshNetwork
+      encryption: sae
+      key: MeshPassword123!
+
+dhcp:
+  sections:
+    lan:
+      interface: lan
+      start: 100
+      limit: 150
+      leasetime: 12h
+
+    guest:
+      interface: guest
+      start: 50
+      limit: 100
+      leasetime: 1h
+
+firewall:
+  zones:
+    lan:
+      name: lan
+      input: ACCEPT
+      output: ACCEPT
+      forward: ACCEPT
+      network:
+        - lan
+
+    wan:
+      name: wan
+      input: REJECT
+      output: ACCEPT
+      forward: REJECT
+      masq: true
+      mtu_fix: true
+      network:
+        - wan
+
+    guest:
+      name: guest
+      input: REJECT
+      output: ACCEPT
+      forward: REJECT
+      network:
+        - guest
+
+  forwardings:
+    - src: lan
+      dest: wan
+    - src: guest
+      dest: wan

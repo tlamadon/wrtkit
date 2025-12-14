@@ -1,0 +1,62 @@
+network:
+  devices:
+    br_lan:
+      name: br-lan
+      type: bridge
+      ports:
+      - lan1
+      - lan2
+      - lan3
+      - lan4
+  interfaces:
+    lan:
+      device: br-lan
+      proto: static
+      ipaddr: 192.168.3.1
+      netmask: 255.255.255.0
+    wan:
+      device: eth0
+      proto: dhcp
+wireless:
+  radios:
+    radio0:
+      channel: 36
+      htmode: HE80
+      country: US
+      disabled: false
+    radio1:
+      channel: 6
+      htmode: HE20
+      country: US
+      disabled: false
+dhcp:
+  sections:
+    lan:
+      interface: lan
+      start: 100
+      limit: 200
+      leasetime: 12h
+firewall:
+  zones:
+    lan:
+      name: lan
+      input: ACCEPT
+      output: ACCEPT
+      forward: ACCEPT
+      network:
+      - lan
+      index: 0
+    wan:
+      name: wan
+      input: REJECT
+      output: ACCEPT
+      forward: REJECT
+      masq: true
+      mtu_fix: true
+      network:
+      - wan
+      index: 1
+  forwardings:
+  - src: lan
+    dest: wan
+    index: 0
