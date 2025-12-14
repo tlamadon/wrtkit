@@ -86,7 +86,10 @@ nav:
     - DHCP Configuration: guide/dhcp.md
     - Firewall Configuration: guide/firewall.md
     - SSH Operations: guide/ssh.md
+    - Serial Console: SERIAL_CONNECTION.md
     - Configuration Management: guide/config-management.md
+    - Troubleshooting: TROUBLESHOOTING.md
+    - Diff Comparison: diff_comparison.md
   - Examples:
     - Basic Router: examples/basic-router.md
     - Mesh Network: examples/mesh-network.md

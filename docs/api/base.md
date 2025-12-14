@@ -18,15 +18,7 @@ Base classes used throughout WRTKit.
       show_root_heading: true
       members:
         - __init__
-        - set_option
-        - add_list_option
         - get_commands
-
-## BaseBuilder
-
-::: wrtkit.base.BaseBuilder
-    options:
-      show_root_heading: true
 
 ## See Also
 

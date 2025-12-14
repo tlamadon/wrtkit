@@ -55,7 +55,7 @@ c) **Parser errors are hidden**
 
 **Symptom:** Some settings detected, others missing
 
-The parser at [config.py:221-258](src/wrtkit/config.py:221-258) only handles:
+The parser at config.py:221-258 only handles:
 - Section definitions: `package.section=type`
 - Options: `package.section.option=value`
 

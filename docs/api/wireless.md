@@ -1,6 +1,6 @@
 # Wireless API
 
-Wireless configuration classes and builders.
+Wireless configuration classes.
 
 ## WirelessConfig
 
@@ -8,61 +8,66 @@ Wireless configuration classes and builders.
     options:
       show_root_heading: true
       members:
-        - radio
-        - wifi_iface
+        - add_radio
+        - add_interface
         - get_commands
 
-## RadioBuilder
+## WirelessRadio
 
-::: wrtkit.wireless.RadioBuilder
+::: wrtkit.wireless.WirelessRadio
     options:
       show_root_heading: true
       members:
-        - channel
-        - htmode
-        - country
-        - disabled
-        - txpower
+        - with_channel
+        - with_htmode
+        - with_country
+        - with_disabled
+        - with_txpower
 
-## WiFiInterfaceBuilder
+## WirelessInterface
 
-::: wrtkit.wireless.WiFiInterfaceBuilder
+::: wrtkit.wireless.WirelessInterface
     options:
       show_root_heading: true
       members:
-        - device
-        - mode
-        - network
-        - ssid
-        - encryption
-        - key
-        - ifname
-        - mesh_id
-        - mesh_fwding
-        - mcast_rate
-        - ieee80211r
-        - ft_over_ds
-        - ft_psk_generate_local
+        - with_device
+        - with_mode
+        - with_network
+        - with_ssid
+        - with_encryption
+        - with_key
+        - with_ifname
+        - with_mesh_id
+        - with_mesh_fwding
+        - with_mcast_rate
+        - with_ieee80211r
+        - with_ft_over_ds
+        - with_ft_psk_generate_local
+        - with_ap
+        - with_mesh
 
 ## Usage Example
 
 ```python
+from wrtkit import UCIConfig
+from wrtkit.wireless import WirelessRadio, WirelessInterface
+
 config = UCIConfig()
 
-# Configure radio
-config.wireless.radio("radio0") \
-    .channel(11) \
-    .htmode("HT20") \
-    .country("US")
+# Create a radio
+radio = WirelessRadio("radio0")\
+    .with_channel(11)\
+    .with_htmode("HT20")\
+    .with_country("US")\
+    .with_disabled(False)
+config.wireless.add_radio(radio)
 
-# Create access point
-config.wireless.wifi_iface("ap") \
-    .device("radio0") \
-    .mode("ap") \
-    .network("lan") \
-    .ssid("MyNetwork") \
-    .encryption("psk2") \
-    .key("password")
+# Create an AP interface
+ap = WirelessInterface("ap")\
+    .with_device("radio0")\
+    .with_ap("MyNetwork", "psk2", "password123")\
+    .with_network("lan")
+config.wireless.add_interface(ap)
 ```
 
 ## See Also

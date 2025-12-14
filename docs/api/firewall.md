@@ -1,6 +1,6 @@
 # Firewall API
 
-Firewall configuration classes and builders.
+Firewall configuration classes.
 
 ## FirewallConfig
 
@@ -8,50 +8,66 @@ Firewall configuration classes and builders.
     options:
       show_root_heading: true
       members:
-        - zone
-        - forwarding
+        - add_zone
+        - add_forwarding
         - get_commands
 
-## ZoneBuilder
+## FirewallZone
 
-::: wrtkit.firewall.ZoneBuilder
+::: wrtkit.firewall.FirewallZone
     options:
       show_root_heading: true
       members:
-        - name
-        - input
-        - output
-        - forward
-        - masq
-        - mtu_fix
-        - add_network
+        - with_name
+        - with_input
+        - with_output
+        - with_forward
+        - with_masq
+        - with_mtu_fix
+        - with_network
+        - with_networks
+        - with_default_policies
 
-## ForwardingBuilder
+## FirewallForwarding
 
-::: wrtkit.firewall.ForwardingBuilder
+::: wrtkit.firewall.FirewallForwarding
     options:
       show_root_heading: true
       members:
-        - src
-        - dest
+        - with_src
+        - with_dest
 
 ## Usage Example
 
 ```python
+from wrtkit import UCIConfig
+from wrtkit.firewall import FirewallZone, FirewallForwarding
+
 config = UCIConfig()
 
-# Create zone
-config.firewall.zone(0) \
-    .name("lan") \
-    .input("ACCEPT") \
-    .output("ACCEPT") \
-    .forward("ACCEPT") \
-    .add_network("lan")
+# Create a LAN zone
+lan_zone = FirewallZone(0)\
+    .with_name("lan")\
+    .with_input("ACCEPT")\
+    .with_output("ACCEPT")\
+    .with_forward("ACCEPT")\
+    .with_network("lan")
+config.firewall.add_zone(lan_zone)
 
-# Create forwarding rule
-config.firewall.forwarding(0) \
-    .src("lan") \
-    .dest("wan")
+# Create a WAN zone
+wan_zone = FirewallZone(1)\
+    .with_name("wan")\
+    .with_input("REJECT")\
+    .with_masq(True)\
+    .with_mtu_fix(True)\
+    .with_network("wan")
+config.firewall.add_zone(wan_zone)
+
+# Create a forwarding rule
+forwarding = FirewallForwarding(0)\
+    .with_src("lan")\
+    .with_dest("wan")
+config.firewall.add_forwarding(forwarding)
 ```
 
 ## See Also

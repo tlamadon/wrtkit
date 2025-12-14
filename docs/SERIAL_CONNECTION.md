@@ -92,7 +92,7 @@ sudo usermod -a -G dialout $USER
 
 ## Examples
 
-See [examples/serial_example.py](examples/serial_example.py) for a complete working example.
+See `examples/serial_example.py` in the repository for a complete working example.
 
 ## Implementation Details
 

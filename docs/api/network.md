@@ -1,6 +1,6 @@
 # Network API
 
-Network configuration classes and builders.
+Network configuration classes.
 
 ## NetworkConfig
 
@@ -8,59 +8,64 @@ Network configuration classes and builders.
     options:
       show_root_heading: true
       members:
-        - device
-        - interface
+        - add_device
+        - add_interface
         - get_commands
 
-## DeviceBuilder
+## NetworkDevice
 
-::: wrtkit.network.DeviceBuilder
+::: wrtkit.network.NetworkDevice
     options:
       show_root_heading: true
       members:
-        - name
-        - type
-        - add_port
-        - ifname
-        - vid
+        - with_name
+        - with_type
+        - with_port
+        - with_ifname
+        - with_vid
 
-## InterfaceBuilder
+## NetworkInterface
 
-::: wrtkit.network.InterfaceBuilder
+::: wrtkit.network.NetworkInterface
     options:
       show_root_heading: true
       members:
-        - device
-        - proto
-        - ipaddr
-        - netmask
-        - gateway
-        - master
-        - mtu
-        - routing_algo
-        - gw_mode
-        - gw_bandwidth
-        - hop_penalty
-        - orig_interval
+        - with_device
+        - with_proto
+        - with_ipaddr
+        - with_netmask
+        - with_gateway
+        - with_master
+        - with_mtu
+        - with_routing_algo
+        - with_gw_mode
+        - with_gw_bandwidth
+        - with_hop_penalty
+        - with_orig_interval
+        - with_static_ip
+        - with_dhcp
 
 ## Usage Example
 
 ```python
+from wrtkit import UCIConfig
+from wrtkit.network import NetworkDevice, NetworkInterface
+
 config = UCIConfig()
 
 # Create a bridge
-config.network.device("br_lan") \
-    .name("br-lan") \
-    .type("bridge") \
-    .add_port("lan1") \
-    .add_port("lan2")
+device = NetworkDevice("br_lan")\
+    .with_name("br-lan")\
+    .with_type("bridge")\
+    .with_port("lan1")\
+    .with_port("lan2")
+config.network.add_device(device)
 
 # Create an interface
-config.network.interface("lan") \
-    .device("br-lan") \
-    .proto("static") \
-    .ipaddr("192.168.1.1") \
-    .netmask("255.255.255.0")
+interface = NetworkInterface("lan")\
+    .with_device("br-lan")\
+    .with_static_ip("192.168.1.1", "255.255.255.0")
+config.network.add_interface(interface)
 ```
 
 ## See Also

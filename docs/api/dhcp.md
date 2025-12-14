@@ -1,6 +1,6 @@
 # DHCP API
 
-DHCP configuration classes and builders.
+DHCP configuration classes.
 
 ## DHCPConfig
 
@@ -8,31 +8,38 @@ DHCP configuration classes and builders.
     options:
       show_root_heading: true
       members:
-        - dhcp
+        - add_dhcp
         - get_commands
 
-## DHCPBuilder
+## DHCPSection
 
-::: wrtkit.dhcp.DHCPBuilder
+::: wrtkit.dhcp.DHCPSection
     options:
       show_root_heading: true
       members:
-        - interface
-        - start
-        - limit
-        - leasetime
-        - ignore
+        - with_interface
+        - with_start
+        - with_limit
+        - with_leasetime
+        - with_ignore
+        - with_range
 
 ## Usage Example
 
 ```python
+from wrtkit import UCIConfig
+from wrtkit.dhcp import DHCPSection
+
 config = UCIConfig()
 
-config.dhcp.dhcp("lan") \
-    .interface("lan") \
-    .start(100) \
-    .limit(150) \
-    .leasetime("12h")
+# Create DHCP section
+section = DHCPSection("lan")\
+    .with_interface("lan")\
+    .with_start(100)\
+    .with_limit(150)\
+    .with_leasetime("12h")
+
+config.dhcp.add_dhcp(section)
 ```
 
 ## See Also
