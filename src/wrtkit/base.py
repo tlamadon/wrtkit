@@ -193,7 +193,7 @@ class UCISection(BaseModel):
         Returns:
             Instance of this model
         """
-        return cls(section_name, **data)
+        return cls(section_name, **data)  # type: ignore[misc]
 
     @classmethod
     def from_json(cls: Type[T], json_str: str, section_name: str) -> T:

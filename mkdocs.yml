@@ -85,6 +85,8 @@ nav:
     - Wireless Configuration: guide/wireless.md
     - DHCP Configuration: guide/dhcp.md
     - Firewall Configuration: guide/firewall.md
+    - YAML/JSON Configuration: yaml-json-guide.md
+    - YAML/JSON Quick Start: quickstart-yaml.md
     - SSH Operations: guide/ssh.md
     - Serial Console: SERIAL_CONNECTION.md
     - Configuration Management: guide/config-management.md

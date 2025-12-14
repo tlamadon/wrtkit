@@ -828,8 +828,8 @@ class UCIConfig:
 
             if "interfaces" in wireless_data:
                 for section_name, interface_data in wireless_data["interfaces"].items():
-                    interface = WirelessInterface(section_name, **interface_data)
-                    config.wireless.add_interface(interface)
+                    wireless_iface = WirelessInterface(section_name, **interface_data)
+                    config.wireless.add_interface(wireless_iface)
 
         # Load DHCP configuration
         if "dhcp" in data:

@@ -146,7 +146,7 @@ Then configure your IDE (VS Code example):
 
 - [Full YAML/JSON Guide](yaml-json-guide.md) - Complete reference
 - [Examples](../examples/) - Real-world examples
-- [API Reference](../README.md) - Full API documentation
+- [API Reference](../api/) - Full API documentation
 
 ## Common Tasks
 

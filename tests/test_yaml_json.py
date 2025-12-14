@@ -5,10 +5,10 @@ import tempfile
 from pathlib import Path
 
 from wrtkit.config import UCIConfig
-from wrtkit.network import NetworkConfig, NetworkDevice, NetworkInterface
-from wrtkit.wireless import WirelessConfig, WirelessRadio, WirelessInterface
-from wrtkit.dhcp import DHCPConfig, DHCPSection
-from wrtkit.firewall import FirewallConfig, FirewallZone, FirewallForwarding
+from wrtkit.network import NetworkDevice, NetworkInterface
+from wrtkit.wireless import WirelessRadio, WirelessInterface
+from wrtkit.dhcp import DHCPSection
+from wrtkit.firewall import FirewallZone, FirewallForwarding
 
 
 def test_network_interface_to_yaml():
