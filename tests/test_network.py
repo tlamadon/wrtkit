@@ -1,6 +1,5 @@
 """Tests for network configuration."""
 
-import pytest
 from wrtkit.network import NetworkConfig, NetworkDevice, NetworkInterface
 from wrtkit.base import UCICommand
 

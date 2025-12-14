@@ -1,6 +1,6 @@
 """Main UCI configuration class."""
 
-from typing import List, Optional, Dict, Set, TYPE_CHECKING
+from typing import List, Dict
 from .base import UCICommand
 from .network import NetworkConfig, NetworkInterface, NetworkDevice
 from .wireless import WirelessConfig, WirelessRadio, WirelessInterface

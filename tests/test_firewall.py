@@ -1,6 +1,5 @@
 """Tests for firewall configuration."""
 
-import pytest
 from wrtkit.firewall import FirewallConfig, FirewallZone, FirewallForwarding
 from wrtkit.base import UCICommand
 

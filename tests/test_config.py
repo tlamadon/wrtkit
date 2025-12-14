@@ -1,6 +1,5 @@
 """Tests for the main UCI configuration."""
 
-import pytest
 from wrtkit import UCIConfig
 
 
@@ -291,8 +290,7 @@ network.lan.ipaddr='192.168.10.1'
 
 def test_config_diff_common_settings():
     """Test that diff tracks common settings between local and remote."""
-    from wrtkit.base import UCICommand
-    from wrtkit.config import ConfigDiff, UCIConfig
+    from wrtkit.config import UCIConfig
 
     # Create a mock SSH connection
     class MockSSH:

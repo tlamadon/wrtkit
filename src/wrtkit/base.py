@@ -1,7 +1,7 @@
 """Base classes for UCI configuration components."""
 
-from typing import Any, Dict, List, Optional, Union
-from pydantic import BaseModel, Field, ConfigDict
+from typing import Any, List, Optional
+from pydantic import BaseModel, ConfigDict
 
 
 class UCICommand:

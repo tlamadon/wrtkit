@@ -1,6 +1,5 @@
 """Tests for DHCP configuration."""
 
-import pytest
 from wrtkit.dhcp import DHCPConfig, DHCPSection
 from wrtkit.base import UCICommand
 

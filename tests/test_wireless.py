@@ -1,6 +1,5 @@
 """Tests for wireless configuration."""
 
-import pytest
 from wrtkit.wireless import WirelessConfig, WirelessRadio, WirelessInterface
 from wrtkit.base import UCICommand
 
