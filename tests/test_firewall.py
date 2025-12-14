@@ -1,14 +1,20 @@
 """Tests for firewall configuration."""
 
 import pytest
-from wrtkit.firewall import FirewallConfig
+from wrtkit.firewall import FirewallConfig, FirewallZone, FirewallForwarding
 from wrtkit.base import UCICommand
 
 
 def test_firewall_zone():
     """Test configuring a firewall zone."""
     fw = FirewallConfig()
-    fw.zone(0).name("lan").input("ACCEPT").output("ACCEPT").forward("ACCEPT").add_network("lan")
+    zone = FirewallZone(0)\
+        .with_name("lan")\
+        .with_input("ACCEPT")\
+        .with_output("ACCEPT")\
+        .with_forward("ACCEPT")\
+        .with_network("lan")
+    fw.add_zone(zone)
 
     commands = fw.get_commands()
 
@@ -22,7 +28,13 @@ def test_firewall_zone():
 def test_wan_zone_with_masq():
     """Test WAN zone with masquerading."""
     fw = FirewallConfig()
-    fw.zone(1).name("wan").input("REJECT").masq(True).mtu_fix(True).add_network("wan")
+    zone = FirewallZone(1)\
+        .with_name("wan")\
+        .with_input("REJECT")\
+        .with_masq(True)\
+        .with_mtu_fix(True)\
+        .with_network("wan")
+    fw.add_zone(zone)
 
     commands = fw.get_commands()
 
@@ -33,7 +45,11 @@ def test_wan_zone_with_masq():
 def test_zone_with_multiple_networks():
     """Test zone with multiple networks."""
     fw = FirewallConfig()
-    fw.zone(0).name("lan").add_network("lan").add_network("guest")
+    zone = FirewallZone(0)\
+        .with_name("lan")\
+        .with_network("lan")\
+        .with_network("guest")
+    fw.add_zone(zone)
 
     commands = fw.get_commands()
 
@@ -45,7 +61,10 @@ def test_zone_with_multiple_networks():
 def test_forwarding_rule():
     """Test firewall forwarding rule."""
     fw = FirewallConfig()
-    fw.forwarding(0).src("lan").dest("wan")
+    forwarding = FirewallForwarding(0)\
+        .with_src("lan")\
+        .with_dest("wan")
+    fw.add_forwarding(forwarding)
 
     commands = fw.get_commands()
 

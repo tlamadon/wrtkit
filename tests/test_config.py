@@ -309,9 +309,15 @@ network.guest.proto='static'"""
 
     config = UCIConfig()
     # Add some local config that matches remote
-    config.network.interface("lan").ipaddr("192.168.1.1").netmask("255.255.255.0")
+    from wrtkit.network import NetworkInterface
+    lan = NetworkInterface("lan")\
+        .with_ipaddr("192.168.1.1")\
+        .with_netmask("255.255.255.0")
+    config.network.add_interface(lan)
+
     # Add some local config that differs from remote
-    config.network.interface("wan").proto("static")
+    wan = NetworkInterface("wan").with_proto("static")
+    config.network.add_interface(wan)
 
     # Get diff
     diff = config.diff(MockSSH(), show_remote_only=True)
@@ -350,7 +356,13 @@ def test_config_diff_list_items():
 
     config = UCIConfig()
     # Add local config with some overlapping and some different list items
-    config.network.device("br_lan").name("br-lan").type("bridge").add_port("lan1").add_port("bat0.10")
+    from wrtkit.network import NetworkDevice
+    device = NetworkDevice("br_lan")\
+        .with_name("br-lan")\
+        .with_type("bridge")\
+        .with_port("lan1")\
+        .with_port("bat0.10")
+    config.network.add_device(device)
 
     # Get diff
     diff = config.diff(MockSSH(), show_remote_only=True)

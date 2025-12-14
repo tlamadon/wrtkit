@@ -1,14 +1,19 @@
 """Tests for wireless configuration."""
 
 import pytest
-from wrtkit.wireless import WirelessConfig
+from wrtkit.wireless import WirelessConfig, WirelessRadio, WirelessInterface
 from wrtkit.base import UCICommand
 
 
 def test_radio_configuration():
     """Test configuring a wireless radio."""
     wireless = WirelessConfig()
-    wireless.radio("radio0").channel(11).htmode("HT20").country("US").disabled(False)
+    radio = WirelessRadio("radio0")\
+        .with_channel(11)\
+        .with_htmode("HT20")\
+        .with_country("US")\
+        .with_disabled(False)
+    wireless.add_radio(radio)
 
     commands = wireless.get_commands()
     assert len(commands) == 5
@@ -23,9 +28,14 @@ def test_radio_configuration():
 def test_ap_interface():
     """Test configuring an AP interface."""
     wireless = WirelessConfig()
-    wireless.wifi_iface("default_ap").device("radio0").mode("ap").network("lan").ssid(
-        "TestNetwork"
-    ).encryption("psk2").key("password123")
+    iface = WirelessInterface("default_ap")\
+        .with_device("radio0")\
+        .with_mode("ap")\
+        .with_network("lan")\
+        .with_ssid("TestNetwork")\
+        .with_encryption("psk2")\
+        .with_key("password123")
+    wireless.add_interface(iface)
 
     commands = wireless.get_commands()
 
@@ -38,9 +48,16 @@ def test_ap_interface():
 def test_mesh_interface():
     """Test configuring a mesh interface."""
     wireless = WirelessConfig()
-    wireless.wifi_iface("mesh0").device("radio1").mode("mesh").ifname("mesh0").mesh_id(
-        "testmesh"
-    ).encryption("sae").key("meshkey").mesh_fwding(False).mcast_rate(18000)
+    iface = WirelessInterface("mesh0")\
+        .with_device("radio1")\
+        .with_mode("mesh")\
+        .with_ifname("mesh0")\
+        .with_mesh_id("testmesh")\
+        .with_encryption("sae")\
+        .with_key("meshkey")\
+        .with_mesh_fwding(False)\
+        .with_mcast_rate(18000)
+    wireless.add_interface(iface)
 
     commands = wireless.get_commands()
 
@@ -53,9 +70,14 @@ def test_mesh_interface():
 def test_80211r_configuration():
     """Test 802.11r fast roaming configuration."""
     wireless = WirelessConfig()
-    wireless.wifi_iface("ap").device("radio0").mode("ap").ssid("test").ieee80211r(
-        True
-    ).ft_over_ds(True).ft_psk_generate_local(True)
+    iface = WirelessInterface("ap")\
+        .with_device("radio0")\
+        .with_mode("ap")\
+        .with_ssid("test")\
+        .with_ieee80211r(True)\
+        .with_ft_over_ds(True)\
+        .with_ft_psk_generate_local(True)
+    wireless.add_interface(iface)
 
     commands = wireless.get_commands()
 

@@ -1,14 +1,20 @@
 """Tests for DHCP configuration."""
 
 import pytest
-from wrtkit.dhcp import DHCPConfig
+from wrtkit.dhcp import DHCPConfig, DHCPSection
 from wrtkit.base import UCICommand
 
 
 def test_dhcp_configuration():
     """Test configuring a DHCP server."""
     dhcp = DHCPConfig()
-    dhcp.dhcp("lan").interface("lan").start(100).limit(150).leasetime("12h").ignore(False)
+    section = DHCPSection("lan")\
+        .with_interface("lan")\
+        .with_start(100)\
+        .with_limit(150)\
+        .with_leasetime("12h")\
+        .with_ignore(False)
+    dhcp.add_dhcp(section)
 
     commands = dhcp.get_commands()
     assert len(commands) == 6
@@ -24,7 +30,10 @@ def test_dhcp_configuration():
 def test_dhcp_disabled():
     """Test disabling a DHCP server."""
     dhcp = DHCPConfig()
-    dhcp.dhcp("guest").interface("guest").ignore(True)
+    section = DHCPSection("guest")\
+        .with_interface("guest")\
+        .with_ignore(True)
+    dhcp.add_dhcp(section)
 
     commands = dhcp.get_commands()
 
