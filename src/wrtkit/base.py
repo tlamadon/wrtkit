@@ -20,6 +20,8 @@ class UCICommand:
             return f"uci set {self.path}='{self.value}'"
         elif self.action == "add_list":
             return f"uci add_list {self.path}='{self.value}'"
+        elif self.action == "del_list":
+            return f"uci del_list {self.path}='{self.value}'"
         elif self.action == "delete":
             return f"uci delete {self.path}"
         else:

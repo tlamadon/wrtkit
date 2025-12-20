@@ -386,3 +386,290 @@ def test_config_diff_list_items():
     # Also check that regular set commands still work (section definition, name, type)
     common_sets = [cmd for cmd in diff.common if cmd.action == "set"]
     assert len(common_sets) == 3  # br_lan section, name, type
+
+
+def test_config_diff_section_markers():
+    """Test that diff tracks section-level presence for tree display."""
+    from wrtkit.base import UCICommand
+    from wrtkit.config import ConfigDiff
+
+    diff = ConfigDiff()
+
+    # Simulate local sections
+    diff._local_sections = {
+        ("network", "lan"),
+        ("network", "wan"),
+        ("wireless", "radio0"),
+    }
+
+    # Simulate remote sections - guest is remote-only, dmz is config-only
+    diff._remote_sections = {
+        ("network", "lan"),
+        ("network", "wan"),
+        ("network", "guest"),
+    }
+
+    # Test section-level detection
+    assert diff.is_section_config_only("wireless", "radio0")
+    assert not diff.is_section_config_only("network", "lan")
+    assert not diff.is_section_config_only("network", "guest")
+
+    assert diff.is_section_remote_only("network", "guest")
+    assert not diff.is_section_remote_only("network", "lan")
+    assert not diff.is_section_remote_only("wireless", "radio0")
+
+    # Test getting lists of sections
+    config_only = diff.get_config_only_sections()
+    assert ("wireless", "radio0") in config_only
+
+    remote_only = diff.get_remote_only_sections()
+    assert ("network", "guest") in remote_only
+
+
+def test_config_diff_tree_section_labels():
+    """Test that tree output shows section-level labels."""
+    from wrtkit.base import UCICommand
+    from wrtkit.config import ConfigDiff
+
+    diff = ConfigDiff()
+
+    # Set up sections
+    diff._local_sections = {("network", "lan")}
+    diff._remote_sections = {("network", "guest")}
+
+    # Add commands
+    diff.to_add = [
+        UCICommand("set", "network.lan.ipaddr", "192.168.1.1"),
+    ]
+    diff.remote_only = [
+        UCICommand("set", "network.guest.proto", "dhcp"),
+    ]
+
+    # Generate tree output without color for easier testing
+    tree_output = diff.to_tree(color=False)
+
+    # Check that section labels are present
+    assert "(config-only)" in tree_output
+    assert "(remote-only)" in tree_output
+
+
+def test_uci_command_del_list():
+    """Test UCI del_list command string generation."""
+    from wrtkit.base import UCICommand
+
+    cmd_del_list = UCICommand("del_list", "network.br_lan.ports", "lan1")
+    assert cmd_del_list.to_string() == "uci del_list network.br_lan.ports='lan1'"
+
+
+def test_config_diff_get_removal_commands():
+    """Test generating removal commands from diff."""
+    from wrtkit.base import UCICommand
+    from wrtkit.config import ConfigDiff
+
+    diff = ConfigDiff()
+
+    # Add items to remove - individual options (not full sections)
+    diff.to_remove = [
+        UCICommand("set", "network.guest.proto", "dhcp"),
+        UCICommand("add_list", "network.br_lan.ports", "lan3"),
+    ]
+    # These sections exist in both local and remote (not remote-only)
+    diff._local_sections = {("network", "guest"), ("network", "br_lan")}
+    diff._remote_sections = {("network", "guest"), ("network", "br_lan")}
+
+    removal_cmds = diff.get_removal_commands()
+
+    assert len(removal_cmds) == 2
+
+    # Check that set commands become delete
+    delete_cmd = next(cmd for cmd in removal_cmds if cmd.action == "delete")
+    assert delete_cmd.path == "network.guest.proto"
+
+    # Check that add_list commands become del_list
+    del_list_cmd = next(cmd for cmd in removal_cmds if cmd.action == "del_list")
+    assert del_list_cmd.path == "network.br_lan.ports"
+    assert del_list_cmd.value == "lan3"
+
+
+def test_config_diff_get_removal_commands_whole_section():
+    """Test that removal commands delete whole section instead of individual options."""
+    from wrtkit.base import UCICommand
+    from wrtkit.config import ConfigDiff
+
+    diff = ConfigDiff()
+
+    # Simulate a remote-only section with multiple options
+    diff.to_remove = [
+        UCICommand("set", "wireless.old_wifi", "wifi-iface"),  # Section definition
+        UCICommand("set", "wireless.old_wifi.device", "radio0"),
+        UCICommand("set", "wireless.old_wifi.ssid", "OldNetwork"),
+        UCICommand("set", "wireless.old_wifi.encryption", "psk2"),
+    ]
+    # Mark old_wifi as remote-only (not in local config)
+    diff._local_sections = set()
+    diff._remote_sections = {("wireless", "old_wifi")}
+
+    removal_cmds = diff.get_removal_commands()
+
+    # Should only have ONE delete command for the section, not 4 individual ones
+    assert len(removal_cmds) == 1
+    assert removal_cmds[0].action == "delete"
+    assert removal_cmds[0].path == "wireless.old_wifi"
+
+
+def test_config_diff_with_show_remote_only_false():
+    """Test that diff with show_remote_only=False puts remote items in to_remove."""
+    from wrtkit.config import UCIConfig
+
+    class MockSSH:
+        def get_uci_config(self, package: str) -> str:
+            if package == "network":
+                return """network.lan=interface
+network.lan.ipaddr='192.168.1.1'
+network.guest=interface
+network.guest.proto='dhcp'"""
+            return ""
+
+    config = UCIConfig()
+    from wrtkit.network import NetworkInterface
+    lan = NetworkInterface("lan").with_ipaddr("192.168.1.1")
+    config.network.add_interface(lan)
+
+    # With show_remote_only=True (default), guest should be in remote_only
+    diff_with_remote_only = config.diff(MockSSH(), show_remote_only=True)
+    assert len(diff_with_remote_only.remote_only) == 2  # guest section + proto
+    assert len(diff_with_remote_only.to_remove) == 0
+
+    # With show_remote_only=False, guest should be in to_remove
+    diff_without_remote_only = config.diff(MockSSH(), show_remote_only=False)
+    assert len(diff_without_remote_only.remote_only) == 0
+    assert len(diff_without_remote_only.to_remove) == 2  # guest section + proto
+
+
+def test_config_diff_has_changes():
+    """Test has_changes method."""
+    from wrtkit.base import UCICommand
+    from wrtkit.config import ConfigDiff
+
+    # Empty diff
+    diff = ConfigDiff()
+    assert not diff.has_changes()
+
+    # Only remote_only (no actionable changes)
+    diff.remote_only = [UCICommand("set", "network.guest.proto", "dhcp")]
+    assert not diff.has_changes()
+
+    # With to_add (has changes)
+    diff.to_add = [UCICommand("set", "network.lan.ipaddr", "192.168.1.1")]
+    assert diff.has_changes()
+
+
+def test_config_diff_per_package_removal():
+    """Test diff with per-package removal (remove_packages parameter)."""
+    from wrtkit.config import UCIConfig
+
+    class MockSSH:
+        def get_uci_config(self, package: str) -> str:
+            if package == "network":
+                return """network.lan=interface
+network.lan.ipaddr='192.168.1.1'
+network.guest=interface
+network.guest.proto='dhcp'"""
+            elif package == "wireless":
+                return """wireless.radio0=wifi-device
+wireless.radio0.channel='11'
+wireless.old_wifi=wifi-iface
+wireless.old_wifi.ssid='OldNetwork'"""
+            elif package == "firewall":
+                return """firewall.@zone[0]=zone
+firewall.@zone[0].name='lan'"""
+            return ""
+
+    config = UCIConfig()
+    from wrtkit.network import NetworkInterface
+    from wrtkit.wireless import WirelessRadio
+
+    lan = NetworkInterface("lan").with_ipaddr("192.168.1.1")
+    config.network.add_interface(lan)
+
+    radio = WirelessRadio("radio0").with_channel(11)
+    config.wireless.add_radio(radio)
+
+    # Test: Only remove unmanaged wireless settings
+    diff = config.diff(MockSSH(), remove_packages=["wireless"])
+
+    # Network guest should be in remote_only (not removed)
+    network_remote_only = [cmd for cmd in diff.remote_only if cmd.path.startswith("network.")]
+    assert len(network_remote_only) == 2  # guest section + proto
+
+    # Wireless old_wifi should be in to_remove
+    wireless_to_remove = [cmd for cmd in diff.to_remove if cmd.path.startswith("wireless.")]
+    assert len(wireless_to_remove) == 2  # old_wifi section + ssid
+
+    # Firewall should be in remote_only (not removed)
+    firewall_remote_only = [cmd for cmd in diff.remote_only if cmd.path.startswith("firewall.")]
+    assert len(firewall_remote_only) == 2  # zone section + name
+
+
+def test_config_diff_get_removal_commands_by_package():
+    """Test get_removal_commands with package filtering."""
+    from wrtkit.base import UCICommand
+    from wrtkit.config import ConfigDiff
+
+    diff = ConfigDiff()
+
+    # Add items to remove from different packages
+    diff.to_remove = [
+        UCICommand("set", "network.guest.proto", "dhcp"),
+        UCICommand("set", "wireless.old_wifi.ssid", "OldNetwork"),
+        UCICommand("add_list", "firewall.@zone[0].network", "guest"),
+    ]
+
+    # Get all removal commands
+    all_cmds = diff.get_removal_commands()
+    assert len(all_cmds) == 3
+
+    # Get only network removal commands
+    network_cmds = diff.get_removal_commands(packages=["network"])
+    assert len(network_cmds) == 1
+    assert network_cmds[0].path == "network.guest.proto"
+
+    # Get network and wireless removal commands
+    net_wifi_cmds = diff.get_removal_commands(packages=["network", "wireless"])
+    assert len(net_wifi_cmds) == 2
+
+    # Get only firewall removal commands (list item)
+    firewall_cmds = diff.get_removal_commands(packages=["firewall"])
+    assert len(firewall_cmds) == 1
+    assert firewall_cmds[0].action == "del_list"
+
+
+def test_config_diff_multiple_packages_removal():
+    """Test diff with multiple packages marked for removal."""
+    from wrtkit.config import UCIConfig
+
+    class MockSSH:
+        def get_uci_config(self, package: str) -> str:
+            if package == "network":
+                return """network.guest=interface
+network.guest.proto='dhcp'"""
+            elif package == "wireless":
+                return """wireless.old_wifi=wifi-iface
+wireless.old_wifi.ssid='OldNetwork'"""
+            elif package == "dhcp":
+                return """dhcp.guest=dhcp
+dhcp.guest.interface='guest'"""
+            return ""
+
+    config = UCIConfig()
+
+    # Remove network and wireless, but keep dhcp
+    diff = config.diff(MockSSH(), remove_packages=["network", "wireless"])
+
+    # Network and wireless should be in to_remove
+    assert len([cmd for cmd in diff.to_remove if cmd.path.startswith("network.")]) == 2
+    assert len([cmd for cmd in diff.to_remove if cmd.path.startswith("wireless.")]) == 2
+
+    # DHCP should be in remote_only
+    assert len([cmd for cmd in diff.remote_only if cmd.path.startswith("dhcp.")]) == 2
+    assert len([cmd for cmd in diff.to_remove if cmd.path.startswith("dhcp.")]) == 0

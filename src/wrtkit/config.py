@@ -2,13 +2,14 @@
 
 import json
 import yaml
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional, TYPE_CHECKING
 from .base import UCICommand
 from .network import NetworkConfig, NetworkInterface, NetworkDevice
 from .wireless import WirelessConfig, WirelessRadio, WirelessInterface
 from .dhcp import DHCPConfig, DHCPSection
 from .firewall import FirewallConfig, FirewallZone, FirewallForwarding
 from .ssh import SSHConnection
+from .progress import Spinner, ProgressBar
 
 
 # ANSI color codes for terminal output
@@ -32,10 +33,97 @@ class ConfigDiff:
         self.to_modify: List[tuple[UCICommand, UCICommand]] = []
         self.remote_only: List[UCICommand] = []  # UCI settings on remote but not mentioned in config
         self.common: List[UCICommand] = []  # UCI settings that match between local and remote
+        # Section-level tracking for tree display
+        self._local_sections: set[tuple[str, str]] = set()  # (package, section) pairs in local config
+        self._remote_sections: set[tuple[str, str]] = set()  # (package, section) pairs on remote
 
     def is_empty(self) -> bool:
         """Check if there are no differences."""
         return not (self.to_add or self.to_remove or self.to_modify or self.remote_only)
+
+    def has_changes(self) -> bool:
+        """Check if there are any changes to apply (excluding remote-only)."""
+        return bool(self.to_add or self.to_remove or self.to_modify)
+
+    def get_removal_commands(self, packages: List[str] | None = None) -> List[UCICommand]:
+        """
+        Get UCI delete commands for items that should be removed.
+
+        This method is smart about deletions:
+        - If an entire section is remote-only, it deletes just the section (not each option)
+        - If only some options within a section need removal, it deletes those options
+        - For list items, it uses del_list to remove specific values
+
+        Args:
+            packages: Optional list of packages to filter by (e.g., ["network", "wireless"]).
+                      If None, returns removal commands for all packages.
+
+        Returns:
+            List of UCICommand with action='delete' for items to remove
+        """
+        removal_cmds = []
+        deleted_sections: set[str] = set()  # Track sections we're already deleting
+
+        # First pass: identify sections that are entirely remote-only
+        # These are sections where the section itself is in to_remove
+        for cmd in self.to_remove:
+            parts = cmd.path.split(".")
+            if len(parts) == 2:
+                # This is a section definition (e.g., "wireless.mesh0_iface")
+                pkg, section = parts[0], parts[1]
+                if packages is None or pkg in packages:
+                    if self.is_section_remote_only(pkg, section):
+                        deleted_sections.add(cmd.path)
+
+        # Second pass: generate removal commands
+        for cmd in self.to_remove:
+            # Filter by package if specified
+            parts = cmd.path.split(".")
+            if len(parts) < 2:
+                continue
+
+            cmd_package = parts[0]
+            if packages is not None and cmd_package not in packages:
+                continue
+
+            # Check if this is a section definition or an option within a section
+            if len(parts) == 2:
+                # Section definition - delete the whole section
+                removal_cmds.append(UCICommand("delete", cmd.path, None))
+            else:
+                # Option within a section (e.g., "wireless.mesh0_iface.device")
+                section_path = f"{parts[0]}.{parts[1]}"
+
+                # Skip if we're already deleting the entire section
+                if section_path in deleted_sections:
+                    continue
+
+                if cmd.action == "add_list":
+                    # For list items, use del_list
+                    removal_cmds.append(UCICommand("del_list", cmd.path, cmd.value))
+                else:
+                    # For set commands, delete the option
+                    removal_cmds.append(UCICommand("delete", cmd.path, None))
+
+        return removal_cmds
+
+    def is_section_config_only(self, package: str, section: str) -> bool:
+        """Check if a section exists only in config (not on remote)."""
+        key = (package, section)
+        return key in self._local_sections and key not in self._remote_sections
+
+    def is_section_remote_only(self, package: str, section: str) -> bool:
+        """Check if a section exists only on remote (not in config)."""
+        key = (package, section)
+        return key not in self._local_sections and key in self._remote_sections
+
+    def get_config_only_sections(self) -> List[tuple[str, str]]:
+        """Get list of sections that exist only in config."""
+        return sorted(self._local_sections - self._remote_sections)
+
+    def get_remote_only_sections(self) -> List[tuple[str, str]]:
+        """Get list of sections that exist only on remote."""
+        return sorted(self._remote_sections - self._local_sections)
 
     def _group_commands_by_resource(
         self, commands: List[UCICommand]
@@ -165,6 +253,8 @@ class ConfigDiff:
             pkg_color = f"{Colors.BOLD}"
             reset = f"{Colors.RESET}"
             remote_label = f"{Colors.DIM}(remote-only){Colors.RESET}"
+            config_only_label = f"{Colors.GREEN}(config-only){Colors.RESET}"
+            remote_only_section_label = f"{Colors.CYAN}(remote-only){Colors.RESET}"
         else:
             add_sym = "+"
             remove_sym = "-"
@@ -173,6 +263,8 @@ class ConfigDiff:
             pkg_color = ""
             reset = ""
             remote_label = "(remote-only)"
+            config_only_label = "(config-only)"
+            remote_only_section_label = "(remote-only)"
 
         # Group all changes by package and section
         add_grouped = self._group_commands_by_resource(self.to_add)
@@ -223,7 +315,14 @@ class ConfigDiff:
                 section_prefix = "└── " if is_last_section else "├── "
                 item_prefix = "    " if is_last_section else "│   "
 
-                lines.append(f"{section_prefix}{section}")
+                # Determine section-level label
+                section_label = ""
+                if self.is_section_config_only(package, section):
+                    section_label = f" {config_only_label}"
+                elif self.is_section_remote_only(package, section):
+                    section_label = f" {remote_only_section_label}"
+
+                lines.append(f"{section_prefix}{section}{section_label}")
 
                 # Add commands to add
                 if package in add_grouped and section in add_grouped[package]:
@@ -419,16 +518,24 @@ class UCIConfig:
 
         return commands
 
-    def _parse_remote_config(self, ssh: SSHConnection) -> List[UCICommand]:
+    def _parse_remote_config(
+        self, ssh: SSHConnection, spinner: Optional[Spinner] = None
+    ) -> List[UCICommand]:
         """
         Parse the remote UCI configuration into commands.
 
         Handles both 'uci export' and 'uci show' format.
+
+        Args:
+            ssh: SSH connection to the remote device
+            spinner: Optional spinner to update with progress
         """
         commands = []
         packages = ["network", "wireless", "dhcp", "firewall"]
 
         for package in packages:
+            if spinner:
+                spinner.update(f"Fetching {package} config...")
             try:
                 config_str = ssh.get_uci_config(package)
 
@@ -447,21 +554,56 @@ class UCIConfig:
 
         return commands
 
-    def diff(self, ssh: SSHConnection, show_remote_only: bool = True) -> ConfigDiff:
+    def diff(
+        self,
+        ssh: SSHConnection,
+        show_remote_only: bool = True,
+        remove_packages: List[str] | None = None,
+        verbose: bool = False,
+    ) -> ConfigDiff:
         """
         Compare this configuration with the remote device configuration.
 
         Args:
             ssh: SSH connection to the remote device
-            show_remote_only: If True, track UCI settings on remote but not mentioned in local config
+            show_remote_only: If True, track UCI settings on remote but not mentioned in local config.
+                              If False, all remote-only settings go to to_remove.
+            remove_packages: Optional list of packages for which remote-only settings should be
+                             marked for removal (e.g., ["network", "wireless"]). When specified,
+                             only these packages' remote-only settings go to to_remove, others
+                             go to remote_only. This overrides show_remote_only for the
+                             specified packages.
+            verbose: If True, show progress spinner while fetching remote config
 
         Returns:
             A ConfigDiff object describing the differences
         """
         local_commands = self.get_all_commands()
-        remote_commands = self._parse_remote_config(ssh)
+
+        if verbose:
+            spinner = Spinner("Fetching remote configuration...")
+            spinner.start()
+            try:
+                remote_commands = self._parse_remote_config(ssh, spinner=spinner)
+                spinner.stop("✓ Remote configuration fetched")
+            except Exception:
+                spinner.stop("✗ Failed to fetch remote configuration")
+                raise
+        else:
+            remote_commands = self._parse_remote_config(ssh)
 
         diff = ConfigDiff()
+
+        # Build section-level tracking for tree display
+        for cmd in local_commands:
+            parts = cmd.path.split(".")
+            if len(parts) >= 2:
+                diff._local_sections.add((parts[0], parts[1]))
+
+        for cmd in remote_commands:
+            parts = cmd.path.split(".")
+            if len(parts) >= 2:
+                diff._remote_sections.add((parts[0], parts[1]))
 
         # Create sets for comparison
         # For add_list commands, we compare (path, value) pairs
@@ -502,20 +644,31 @@ class UCIConfig:
         for cmd in remote_commands:
             key = (cmd.path, cmd.value)
             if key not in local_set:
+                # Determine if this command should be marked for removal
+                cmd_package = cmd.path.split(".")[0]
+                should_remove = False
+
+                if remove_packages is not None:
+                    # Per-package removal: only remove if package is in the list
+                    should_remove = cmd_package in remove_packages
+                elif not show_remote_only:
+                    # Global removal: remove all remote-only
+                    should_remove = True
+
                 # For add_list commands, if the (path, value) pair doesn't exist locally, it's remote-only
                 if cmd.action == "add_list":
-                    if show_remote_only:
-                        diff.remote_only.append(cmd)
-                    else:
+                    if should_remove:
                         diff.to_remove.append(cmd)
+                    else:
+                        diff.remote_only.append(cmd)
                 else:
                     # For set commands, check if path exists in local
                     if cmd.path not in local_paths:
                         # Path doesn't exist in local config at all
-                        if show_remote_only:
-                            diff.remote_only.append(cmd)
-                        else:
+                        if should_remove:
                             diff.to_remove.append(cmd)
+                        else:
+                            diff.remote_only.append(cmd)
 
         return diff
 
@@ -525,6 +678,7 @@ class UCIConfig:
         dry_run: bool = False,
         auto_commit: bool = True,
         auto_reload: bool = True,
+        verbose: bool = False,
     ) -> None:
         """
         Apply this configuration to a remote device.
@@ -534,6 +688,7 @@ class UCIConfig:
             dry_run: If True, only show what would be done
             auto_commit: If True, automatically commit changes
             auto_reload: If True, automatically reload network and wireless
+            verbose: If True, show progress spinner and status messages
         """
         commands = self.get_all_commands()
 
@@ -548,21 +703,193 @@ class UCIConfig:
                 print("  wifi reload")
             return
 
-        # Execute commands
-        for cmd in commands:
-            stdout, stderr, exit_code = ssh.execute_uci_command(cmd.to_string())
-            if exit_code != 0:
-                raise RuntimeError(
-                    f"Failed to execute command '{cmd.to_string()}': {stderr}"
-                )
+        # Calculate total steps
+        total_steps = len(commands) + (1 if auto_commit else 0) + (1 if auto_reload else 0)
 
-        # Commit changes
-        if auto_commit:
-            ssh.commit_changes()
+        if verbose and total_steps > 0:
+            progress = ProgressBar(total_steps, "Applying configuration")
+            progress._render()
+        else:
+            progress = None
 
-        # Reload configuration
-        if auto_reload:
-            ssh.reload_config()
+        try:
+            # Execute commands
+            for cmd in commands:
+                if progress:
+                    parts = cmd.path.split(".")
+                    if len(parts) >= 2:
+                        progress.update(message=f"Applying {parts[0]}.{parts[1]}")
+                    else:
+                        progress.update()
+
+                stdout, stderr, exit_code = ssh.execute_uci_command(cmd.to_string())
+                if exit_code != 0:
+                    if progress:
+                        progress.finish(f"✗ Failed at command: {cmd.to_string()}")
+                    raise RuntimeError(
+                        f"Failed to execute command '{cmd.to_string()}': {stderr}"
+                    )
+
+            # Commit changes
+            if auto_commit:
+                if progress:
+                    progress.update(message="Committing changes")
+                ssh.commit_changes()
+
+            # Reload configuration
+            if auto_reload:
+                if progress:
+                    progress.update(message="Reloading services")
+                ssh.reload_config()
+
+            if progress:
+                progress.finish(f"✓ Applied {len(commands)} commands")
+
+        except Exception:
+            if progress:
+                progress.finish("✗ Failed to apply configuration")
+            raise
+
+    def apply_diff(
+        self,
+        ssh: SSHConnection,
+        remove_unmanaged: bool | List[str] = False,
+        dry_run: bool = False,
+        auto_commit: bool = True,
+        auto_reload: bool = True,
+        verbose: bool = False,
+    ) -> ConfigDiff:
+        """
+        Apply only the differences between this config and the remote device.
+
+        This method first computes the diff, then applies only the necessary changes.
+        Optionally can remove settings that exist on the remote but are not defined
+        in this configuration.
+
+        Args:
+            ssh: SSH connection to the remote device
+            remove_unmanaged: Controls removal of settings on remote not in config.
+                - False (default): Don't remove any unmanaged settings
+                - True: Remove ALL unmanaged settings (use with caution!)
+                - List of packages: Remove unmanaged settings only for specified packages.
+                  Valid packages: "network", "wireless", "dhcp", "firewall"
+                  Example: ["network", "wireless"] removes unmanaged network and wireless
+                  settings but keeps unmanaged dhcp and firewall settings.
+            dry_run: If True, only show what would be done without making changes
+            auto_commit: If True, automatically commit changes
+            auto_reload: If True, automatically reload network and wireless
+            verbose: If True, show progress spinner and status messages
+
+        Returns:
+            The ConfigDiff object showing what was (or would be) applied
+
+        Examples:
+            # Only apply additions and modifications, keep all remote-only settings
+            config.apply_diff(ssh)
+
+            # Remove ALL unmanaged settings (dangerous!)
+            config.apply_diff(ssh, remove_unmanaged=True)
+
+            # Remove unmanaged wireless interfaces but keep everything else
+            config.apply_diff(ssh, remove_unmanaged=["wireless"])
+
+            # Remove unmanaged network and wireless settings
+            config.apply_diff(ssh, remove_unmanaged=["network", "wireless"])
+
+            # Show progress during apply
+            config.apply_diff(ssh, verbose=True)
+        """
+        # Determine how to handle remote-only items
+        remove_packages: List[str] | None = None
+        if isinstance(remove_unmanaged, list):
+            remove_packages = remove_unmanaged
+            # Get the diff with per-package removal
+            diff = self.diff(ssh, remove_packages=remove_packages, verbose=verbose)
+        elif remove_unmanaged:
+            # Remove all unmanaged
+            diff = self.diff(ssh, show_remote_only=False, verbose=verbose)
+        else:
+            # Don't remove anything
+            diff = self.diff(ssh, show_remote_only=True, verbose=verbose)
+
+        if diff.is_empty() and not diff.to_remove:
+            if not dry_run:
+                print("No changes to apply.")
+            return diff
+
+        # Build list of commands to execute
+        commands_to_run: List[UCICommand] = []
+
+        # First, handle removals (delete commands should come first)
+        if remove_unmanaged and diff.to_remove:
+            commands_to_run.extend(diff.get_removal_commands())
+
+        # Add new settings
+        commands_to_run.extend(diff.to_add)
+
+        # Modify existing settings (just apply the new values)
+        for old_cmd, new_cmd in diff.to_modify:
+            commands_to_run.append(new_cmd)
+
+        if dry_run:
+            print("Dry run - commands that would be executed:")
+            for cmd in commands_to_run:
+                print(f"  {cmd.to_string()}")
+            if auto_commit:
+                print("  uci commit")
+            if auto_reload:
+                print("  /etc/init.d/network restart")
+                print("  wifi reload")
+            return diff
+
+        # Execute commands with progress
+        total_steps = len(commands_to_run) + (1 if auto_commit else 0) + (1 if auto_reload else 0)
+
+        if verbose and total_steps > 0:
+            progress = ProgressBar(total_steps, "Applying configuration")
+            progress._render()
+        else:
+            progress = None
+
+        try:
+            for i, cmd in enumerate(commands_to_run):
+                if progress:
+                    # Extract a short description of what we're doing
+                    parts = cmd.path.split(".")
+                    if len(parts) >= 2:
+                        progress.update(message=f"Applying {parts[0]}.{parts[1]}")
+                    else:
+                        progress.update()
+
+                stdout, stderr, exit_code = ssh.execute_uci_command(cmd.to_string())
+                if exit_code != 0:
+                    if progress:
+                        progress.finish(f"✗ Failed at command: {cmd.to_string()}")
+                    raise RuntimeError(
+                        f"Failed to execute command '{cmd.to_string()}': {stderr}"
+                    )
+
+            # Commit changes
+            if auto_commit:
+                if progress:
+                    progress.update(message="Committing changes")
+                ssh.commit_changes()
+
+            # Reload configuration
+            if auto_reload:
+                if progress:
+                    progress.update(message="Reloading services")
+                ssh.reload_config()
+
+            if progress:
+                progress.finish(f"✓ Applied {len(commands_to_run)} changes")
+
+        except Exception:
+            if progress:
+                progress.finish("✗ Failed to apply configuration")
+            raise
+
+        return diff
 
     def save_to_file(self, filename: str, include_commit: bool = True, include_reload: bool = True) -> None:
         """
