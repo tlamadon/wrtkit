@@ -3,7 +3,7 @@
 import serial
 import time
 import re
-from typing import Optional, Tuple, List
+from typing import Optional, Tuple, List, Any
 
 
 class SerialConnection:
@@ -76,6 +76,8 @@ class SerialConnection:
             self._is_logged_in = True
             return
 
+        assert self._serial is not None, "Serial connection not established"
+
         # Read current output
         output = self._read_until_prompt_or_login()
 
@@ -102,6 +104,8 @@ class SerialConnection:
         if timeout is None:
             timeout = self.timeout
 
+        assert self._serial is not None, "Serial connection not established"
+
         output = ""
         start_time = time.time()
 
@@ -121,6 +125,8 @@ class SerialConnection:
         """Wait for the shell prompt and return all output."""
         if timeout is None:
             timeout = self.timeout
+
+        assert self._serial is not None, "Serial connection not established"
 
         output = ""
         start_time = time.time()
@@ -156,6 +162,8 @@ class SerialConnection:
         """
         if self._serial is None or not self._serial.is_open:
             self.connect()
+
+        assert self._serial is not None, "Serial connection not established"
 
         # Clear input buffer
         self._serial.reset_input_buffer()
@@ -259,6 +267,6 @@ class SerialConnection:
         self.connect()
         return self
 
-    def __exit__(self, exc_type, exc_val, exc_tb) -> None:
+    def __exit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> None:
         """Context manager exit."""
         self.disconnect()

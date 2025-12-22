@@ -2,7 +2,7 @@
 
 import json
 import yaml
-from typing import List, Dict, Any, Optional, TYPE_CHECKING
+from typing import List, Dict, Any, Optional, Union
 from .base import UCICommand
 from .network import NetworkConfig, NetworkInterface, NetworkDevice
 from .wireless import WirelessConfig, WirelessRadio, WirelessInterface
@@ -46,7 +46,7 @@ class ConfigDiff:
         """Check if there are any changes to apply (excluding remote-only)."""
         return bool(self.to_add or self.to_remove or self.to_modify)
 
-    def get_removal_commands(self, packages: List[str] | None = None) -> List[UCICommand]:
+    def get_removal_commands(self, packages: Optional[List[str]] = None) -> List[UCICommand]:
         """
         Get UCI delete commands for items that should be removed.
 
@@ -566,7 +566,7 @@ class UCIConfig:
         self,
         ssh: SSHConnection,
         show_remote_only: bool = True,
-        remove_packages: List[str] | None = None,
+        remove_packages: Optional[List[str]] = None,
         verbose: bool = False,
     ) -> ConfigDiff:
         """
@@ -761,7 +761,7 @@ class UCIConfig:
     def apply_diff(
         self,
         ssh: SSHConnection,
-        remove_unmanaged: bool | List[str] = False,
+        remove_unmanaged: Union[bool, List[str]] = False,
         dry_run: bool = False,
         auto_commit: bool = True,
         auto_reload: bool = True,
@@ -808,7 +808,7 @@ class UCIConfig:
             config.apply_diff(ssh, verbose=True)
         """
         # Determine how to handle remote-only items
-        remove_packages: List[str] | None = None
+        remove_packages: Optional[List[str]] = None
         if isinstance(remove_unmanaged, list):
             remove_packages = remove_unmanaged
             # Get the diff with per-package removal

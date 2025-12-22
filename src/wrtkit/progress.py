@@ -4,7 +4,7 @@ import sys
 import threading
 import time
 from contextlib import contextmanager
-from typing import Iterator, Optional
+from typing import Iterator, Optional, TextIO
 
 
 class Spinner:
@@ -21,7 +21,7 @@ class Spinner:
         message: str = "Working",
         style: Optional[list[str]] = None,
         interval: float = 0.1,
-        stream: object = sys.stderr,
+        stream: TextIO = sys.stderr,
     ) -> None:
         """
         Initialize the spinner.
@@ -102,7 +102,7 @@ class ProgressBar:
         total: int,
         message: str = "Progress",
         width: int = 30,
-        stream: object = sys.stderr,
+        stream: TextIO = sys.stderr,
     ) -> None:
         """
         Initialize the progress bar.

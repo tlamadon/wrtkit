@@ -390,7 +390,6 @@ def test_config_diff_list_items():
 
 def test_config_diff_section_markers():
     """Test that diff tracks section-level presence for tree display."""
-    from wrtkit.base import UCICommand
     from wrtkit.config import ConfigDiff
 
     diff = ConfigDiff()
