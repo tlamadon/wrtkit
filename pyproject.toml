@@ -31,6 +31,7 @@ dependencies = [
     "pyserial>=3.5",
     "pydantic>=2.0.0",
     "pyyaml>=6.0.0",
+    "omegaconf>=2.3.0",
 ]
 
 [project.optional-dependencies]

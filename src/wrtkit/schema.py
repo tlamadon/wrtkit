@@ -2,6 +2,7 @@
 
 import json
 import yaml
+from omegaconf import OmegaConf
 from typing import Any, Dict, Type, TypeVar
 from pydantic import BaseModel
 
@@ -119,7 +120,10 @@ def model_from_yaml(model_class: Type[T], yaml_str: str, section_name: str = Non
     Returns:
         Instance of the model
     """
-    data = yaml.safe_load(yaml_str)
+    # Load YAML through OmegaConf for variable interpolation and other features
+    omega_conf = OmegaConf.create(yaml_str)
+    # Convert to regular Python dict for Pydantic validation
+    data = OmegaConf.to_container(omega_conf, resolve=True)
     return model_from_dict(model_class, data, section_name)
 
 

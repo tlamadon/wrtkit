@@ -2,6 +2,7 @@
 
 import json
 import yaml
+from omegaconf import OmegaConf
 from typing import List, Dict, Any, Optional, Union
 from .base import UCICommand
 from .network import NetworkConfig, NetworkInterface, NetworkDevice
@@ -1253,7 +1254,10 @@ class UCIConfig:
         Returns:
             UCIConfig instance
         """
-        data = yaml.safe_load(yaml_str)
+        # Load YAML through OmegaConf for variable interpolation and other features
+        omega_conf = OmegaConf.create(yaml_str)
+        # Convert to regular Python dict for Pydantic validation
+        data = OmegaConf.to_container(omega_conf, resolve=True)
         return cls.from_dict(data)
 
     @classmethod
