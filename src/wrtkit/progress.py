@@ -4,7 +4,7 @@ import sys
 import threading
 import time
 from contextlib import contextmanager
-from typing import Iterator, Optional, TextIO
+from typing import Iterator, Optional, TextIO, List
 
 
 class Spinner:
@@ -19,7 +19,7 @@ class Spinner:
     def __init__(
         self,
         message: str = "Working",
-        style: Optional[list[str]] = None,
+        style: Optional[List[str]] = None,
         interval: float = 0.1,
         stream: TextIO = sys.stderr,
     ) -> None:
