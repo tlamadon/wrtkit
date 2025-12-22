@@ -120,7 +120,9 @@ class NetworkInterface(UCISection):
         return self.model_copy(update={"orig_interval": value})
 
     # Convenience builder methods for common configurations
-    def with_static_ip(self, ip: str, netmask: str = "255.255.255.0", gateway: Optional[str] = None) -> "NetworkInterface":
+    def with_static_ip(
+        self, ip: str, netmask: str = "255.255.255.0", gateway: Optional[str] = None
+    ) -> "NetworkInterface":
         """Configure interface with static IP (returns new copy)."""
         updates = {"proto": "static", "ipaddr": ip, "netmask": netmask}
         if gateway:

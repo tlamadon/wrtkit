@@ -86,21 +86,25 @@ class SQMQueue(UCISection):
 
     def with_cake(self, download: int, upload: int) -> "SQMQueue":
         """Configure with CAKE qdisc (returns new copy)."""
-        return self.model_copy(update={
-            "qdisc": "cake",
-            "script": "piece_of_cake.qos",
-            "download": download,
-            "upload": upload
-        })
+        return self.model_copy(
+            update={
+                "qdisc": "cake",
+                "script": "piece_of_cake.qos",
+                "download": download,
+                "upload": upload,
+            }
+        )
 
     def with_fq_codel(self, download: int, upload: int) -> "SQMQueue":
         """Configure with fq_codel qdisc (returns new copy)."""
-        return self.model_copy(update={
-            "qdisc": "fq_codel",
-            "script": "simple.qos",
-            "download": download,
-            "upload": upload
-        })
+        return self.model_copy(
+            update={
+                "qdisc": "fq_codel",
+                "script": "simple.qos",
+                "download": download,
+                "upload": upload,
+            }
+        )
 
     def with_link_layer(self, linklayer: str, overhead: int) -> "SQMQueue":
         """Configure link layer adaptation (returns new copy)."""

@@ -59,9 +59,16 @@ class FirewallZone(UCISection):
         return self.model_copy(update={"network": networks.copy()})
 
     # Convenience builder methods for common configurations
-    def with_default_policies(self, input_policy: str = "ACCEPT", output_policy: str = "ACCEPT", forward_policy: str = "ACCEPT") -> "FirewallZone":
+    def with_default_policies(
+        self,
+        input_policy: str = "ACCEPT",
+        output_policy: str = "ACCEPT",
+        forward_policy: str = "ACCEPT",
+    ) -> "FirewallZone":
         """Set default policies for the zone (returns new copy)."""
-        return self.model_copy(update={"input": input_policy, "output": output_policy, "forward": forward_policy})
+        return self.model_copy(
+            update={"input": input_policy, "output": output_policy, "forward": forward_policy}
+        )
 
 
 class FirewallForwarding(UCISection):

@@ -119,14 +119,18 @@ class WirelessInterface(UCISection):
         return self.model_copy(update={"ft_psk_generate_local": value})
 
     # Convenience builder methods for common configurations
-    def with_ap(self, ssid: str, encryption: str = "psk2", key: Optional[str] = None) -> "WirelessInterface":
+    def with_ap(
+        self, ssid: str, encryption: str = "psk2", key: Optional[str] = None
+    ) -> "WirelessInterface":
         """Configure as access point (returns new copy)."""
         updates = {"mode": "ap", "ssid": ssid, "encryption": encryption}
         if key:
             updates["key"] = key
         return self.model_copy(update=updates)
 
-    def with_mesh(self, mesh_id: str, encryption: str = "sae", key: Optional[str] = None) -> "WirelessInterface":
+    def with_mesh(
+        self, mesh_id: str, encryption: str = "sae", key: Optional[str] = None
+    ) -> "WirelessInterface":
         """Configure as mesh interface (returns new copy)."""
         updates = {"mode": "mesh", "mesh_id": mesh_id, "encryption": encryption}
         if key:

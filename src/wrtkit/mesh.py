@@ -248,9 +248,11 @@ def _get_batman_translation_table(connection: SSHConnection) -> Dict[str, str]:
         # Typical output formats:
         # " * aa:bb:cc:dd:ee:ff   -1 [.P....]   0.000   (cc:dd:ee:ff:00:11)"
         # "   aa:bb:cc:dd:ee:ff   -1 [.P....]   0.000   (cc:dd:ee:ff:00:11)"
-        for cmd in [f"batctl meshif {bat_iface} tg 2>/dev/null",
-                    f"batctl -m {bat_iface} tg 2>/dev/null",
-                    "batctl tg 2>/dev/null"]:
+        for cmd in [
+            f"batctl meshif {bat_iface} tg 2>/dev/null",
+            f"batctl -m {bat_iface} tg 2>/dev/null",
+            "batctl tg 2>/dev/null",
+        ]:
             stdout, _, exit_code = connection.execute(cmd)
             if exit_code == 0 and stdout.strip():
                 for line in stdout.split("\n"):
@@ -296,9 +298,11 @@ def _get_batman_originators(connection: SSHConnection) -> Dict[str, str]:
     bat_ifaces = [iface.strip() for iface in stdout.split("\n") if iface.strip()]
 
     for bat_iface in bat_ifaces:
-        for cmd in [f"batctl meshif {bat_iface} o 2>/dev/null",
-                    f"batctl -m {bat_iface} o 2>/dev/null",
-                    "batctl o 2>/dev/null"]:
+        for cmd in [
+            f"batctl meshif {bat_iface} o 2>/dev/null",
+            f"batctl -m {bat_iface} o 2>/dev/null",
+            "batctl o 2>/dev/null",
+        ]:
             stdout, _, exit_code = connection.execute(cmd)
             if exit_code == 0 and stdout.strip():
                 for line in stdout.split("\n"):
@@ -450,9 +454,7 @@ def _get_interface_ssids(connection: SSHConnection) -> Dict[str, str]:
 
     # Method 4: Query each interface directly if still missing
     # Get list of wireless interfaces
-    stdout, _, _ = connection.execute(
-        "ls -1 /sys/class/net/*/wireless 2>/dev/null | cut -d/ -f5"
-    )
+    stdout, _, _ = connection.execute("ls -1 /sys/class/net/*/wireless 2>/dev/null | cut -d/ -f5")
     wifi_ifaces = [iface.strip() for iface in stdout.split("\n") if iface.strip()]
 
     for iface in wifi_ifaces:
@@ -468,9 +470,7 @@ def _get_interface_ssids(connection: SSHConnection) -> Dict[str, str]:
 
             # Also try iwinfo for this specific interface
             if iface not in interface_to_ssid:
-                stdout, _, exit_code = connection.execute(
-                    f"iwinfo {iface} info 2>/dev/null"
-                )
+                stdout, _, exit_code = connection.execute(f"iwinfo {iface} info 2>/dev/null")
                 if exit_code == 0:
                     essid_match = re.search(r'ESSID:\s*"([^"]+)"', stdout)
                     if essid_match:
@@ -493,9 +493,7 @@ def _get_wireless_interfaces(connection: SSHConnection) -> List[str]:
 
     # Fallback to listing /sys/class/ieee80211
     if not interfaces:
-        stdout, _, _ = connection.execute(
-            "ls /sys/class/net/*/wireless 2>/dev/null | cut -d/ -f5"
-        )
+        stdout, _, _ = connection.execute("ls /sys/class/net/*/wireless 2>/dev/null | cut -d/ -f5")
         interfaces = [iface.strip() for iface in stdout.split("\n") if iface.strip()]
 
     return interfaces
@@ -537,8 +535,10 @@ def _get_node_batman_mac(connection: SSHConnection) -> Optional[str]:
 
     for bat_iface in bat_ifaces:
         # Method 1: Try reading the primary/originator address directly (sysfs paths)
-        for path in [f"/sys/class/net/{bat_iface}/mesh/orig_address",
-                     f"/sys/class/net/{bat_iface}/batman_adv/orig_address"]:
+        for path in [
+            f"/sys/class/net/{bat_iface}/mesh/orig_address",
+            f"/sys/class/net/{bat_iface}/batman_adv/orig_address",
+        ]:
             stdout, _, exit_code = connection.execute(f"cat {path} 2>/dev/null")
             if exit_code == 0 and stdout.strip():
                 mac = stdout.strip().lower()
@@ -558,9 +558,11 @@ def _get_node_batman_mac(connection: SSHConnection) -> Optional[str]:
                     return mac
 
         # Method 3: Use batctl to get the list of hard interfaces
-        for cmd in [f"batctl meshif {bat_iface} if 2>/dev/null",
-                    f"batctl -m {bat_iface} if 2>/dev/null",
-                    "batctl if 2>/dev/null"]:
+        for cmd in [
+            f"batctl meshif {bat_iface} if 2>/dev/null",
+            f"batctl -m {bat_iface} if 2>/dev/null",
+            "batctl if 2>/dev/null",
+        ]:
             stdout, _, exit_code = connection.execute(cmd)
             if exit_code == 0 and stdout.strip():
                 # Format: "wlan0-mesh: active" or "mesh0: active"
@@ -580,7 +582,9 @@ def _get_node_batman_mac(connection: SSHConnection) -> Optional[str]:
                 break
 
         # Method 4: Fall back to bat0 interface MAC itself
-        stdout, _, exit_code = connection.execute(f"cat /sys/class/net/{bat_iface}/address 2>/dev/null")
+        stdout, _, exit_code = connection.execute(
+            f"cat /sys/class/net/{bat_iface}/address 2>/dev/null"
+        )
         if exit_code == 0 and stdout.strip():
             return stdout.strip().lower()
 

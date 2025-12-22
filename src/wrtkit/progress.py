@@ -147,7 +147,9 @@ class ProgressBar:
         filled = int(self.width * self.current / max(self.total, 1))
         bar = "█" * filled + "░" * (self.width - filled)
 
-        self.stream.write(f"\r\033[K{self.message} [{bar}] {self.current}/{self.total} ({percent}%)")
+        self.stream.write(
+            f"\r\033[K{self.message} [{bar}] {self.current}/{self.total} ({percent}%)"
+        )
         self.stream.flush()
 
     def finish(self, final_message: Optional[str] = None) -> None:
@@ -194,7 +196,9 @@ def spinner(message: str, success_message: Optional[str] = None) -> Iterator[Spi
 
 
 @contextmanager
-def progress_bar(total: int, message: str, success_message: Optional[str] = None) -> Iterator[ProgressBar]:
+def progress_bar(
+    total: int, message: str, success_message: Optional[str] = None
+) -> Iterator[ProgressBar]:
     """
     Context manager for displaying a progress bar.
 

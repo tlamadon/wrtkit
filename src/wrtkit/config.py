@@ -3,7 +3,7 @@
 import json
 import yaml
 from omegaconf import OmegaConf
-from typing import List, Dict, Any, Optional, Union
+from typing import List, Dict, Any, Optional, Union, cast
 from .base import UCICommand
 from .network import NetworkConfig, NetworkInterface, NetworkDevice
 from .wireless import WirelessConfig, WirelessRadio, WirelessInterface
@@ -17,13 +17,14 @@ from .progress import Spinner, ProgressBar
 # ANSI color codes for terminal output
 class Colors:
     """ANSI color codes for terminal output."""
-    GREEN = '\033[92m'      # For additions (+)
-    YELLOW = '\033[93m'     # For modifications (~)
-    CYAN = '\033[96m'       # For remote-only (*)
-    RED = '\033[91m'        # For removals (-)
-    RESET = '\033[0m'       # Reset to default
-    BOLD = '\033[1m'        # Bold text
-    DIM = '\033[2m'         # Dim text
+
+    GREEN = "\033[92m"  # For additions (+)
+    YELLOW = "\033[93m"  # For modifications (~)
+    CYAN = "\033[96m"  # For remote-only (*)
+    RED = "\033[91m"  # For removals (-)
+    RESET = "\033[0m"  # Reset to default
+    BOLD = "\033[1m"  # Bold text
+    DIM = "\033[2m"  # Dim text
 
 
 class ConfigDiff:
@@ -33,10 +34,14 @@ class ConfigDiff:
         self.to_add: List[UCICommand] = []
         self.to_remove: List[UCICommand] = []
         self.to_modify: List[tuple[UCICommand, UCICommand]] = []
-        self.remote_only: List[UCICommand] = []  # UCI settings on remote but not mentioned in config
+        self.remote_only: List[UCICommand] = (
+            []
+        )  # UCI settings on remote but not mentioned in config
         self.common: List[UCICommand] = []  # UCI settings that match between local and remote
         # Section-level tracking for tree display
-        self._local_sections: set[tuple[str, str]] = set()  # (package, section) pairs in local config
+        self._local_sections: set[tuple[str, str]] = (
+            set()
+        )  # (package, section) pairs in local config
         self._remote_sections: set[tuple[str, str]] = set()  # (package, section) pairs on remote
 
     def is_empty(self) -> bool:
@@ -329,19 +334,31 @@ class ConfigDiff:
                 # Add commands to add
                 if package in add_grouped and section in add_grouped[package]:
                     for cmd in add_grouped[package][section]:
-                        option = ".".join(cmd.path.split(".")[2:]) if len(cmd.path.split(".")) > 2 else cmd.path
+                        option = (
+                            ".".join(cmd.path.split(".")[2:])
+                            if len(cmd.path.split(".")) > 2
+                            else cmd.path
+                        )
                         lines.append(f"{item_prefix}  {add_sym} {option} = {cmd.value}")
 
                 # Add commands to remove
                 if package in remove_grouped and section in remove_grouped[package]:
                     for cmd in remove_grouped[package][section]:
-                        option = ".".join(cmd.path.split(".")[2:]) if len(cmd.path.split(".")) > 2 else cmd.path
+                        option = (
+                            ".".join(cmd.path.split(".")[2:])
+                            if len(cmd.path.split(".")) > 2
+                            else cmd.path
+                        )
                         lines.append(f"{item_prefix}  {remove_sym} {option} = {cmd.value}")
 
                 # Add commands to modify
                 if package in modify_grouped and section in modify_grouped[package]:
                     for old_cmd, new_cmd in modify_grouped[package][section]:
-                        option = ".".join(new_cmd.path.split(".")[2:]) if len(new_cmd.path.split(".")) > 2 else new_cmd.path
+                        option = (
+                            ".".join(new_cmd.path.split(".")[2:])
+                            if len(new_cmd.path.split(".")) > 2
+                            else new_cmd.path
+                        )
                         lines.append(f"{item_prefix}  {modify_sym} {option}")
                         lines.append(f"{item_prefix}    {remove_sym} {old_cmd.value}")
                         lines.append(f"{item_prefix}    {add_sym} {new_cmd.value}")
@@ -349,8 +366,14 @@ class ConfigDiff:
                 # Add remote-only commands
                 if package in remote_only_grouped and section in remote_only_grouped[package]:
                     for cmd in remote_only_grouped[package][section]:
-                        option = ".".join(cmd.path.split(".")[2:]) if len(cmd.path.split(".")) > 2 else cmd.path
-                        lines.append(f"{item_prefix}  {remote_sym} {option} = {cmd.value} {remote_label}")
+                        option = (
+                            ".".join(cmd.path.split(".")[2:])
+                            if len(cmd.path.split(".")) > 2
+                            else cmd.path
+                        )
+                        lines.append(
+                            f"{item_prefix}  {remote_sym} {option} = {cmd.value} {remote_label}"
+                        )
 
         # Summary footer
         summary_parts = []
@@ -383,42 +406,42 @@ class UCIConfig:
         self.sqm = SQMConfig()
 
     # Convenience methods to maintain backward compatibility
-    def add_network_interface(self, interface: 'NetworkInterface') -> 'UCIConfig':
+    def add_network_interface(self, interface: "NetworkInterface") -> "UCIConfig":
         """Add a network interface to the configuration."""
         self.network.add_interface(interface)
         return self
 
-    def add_network_device(self, device: 'NetworkDevice') -> 'UCIConfig':
+    def add_network_device(self, device: "NetworkDevice") -> "UCIConfig":
         """Add a network device to the configuration."""
         self.network.add_device(device)
         return self
 
-    def add_wireless_radio(self, radio: 'WirelessRadio') -> 'UCIConfig':
+    def add_wireless_radio(self, radio: "WirelessRadio") -> "UCIConfig":
         """Add a wireless radio to the configuration."""
         self.wireless.add_radio(radio)
         return self
 
-    def add_wireless_interface(self, interface: 'WirelessInterface') -> 'UCIConfig':
+    def add_wireless_interface(self, interface: "WirelessInterface") -> "UCIConfig":
         """Add a wireless interface to the configuration."""
         self.wireless.add_interface(interface)
         return self
 
-    def add_dhcp_section(self, dhcp: 'DHCPSection') -> 'UCIConfig':
+    def add_dhcp_section(self, dhcp: "DHCPSection") -> "UCIConfig":
         """Add a DHCP section to the configuration."""
         self.dhcp.add_dhcp(dhcp)
         return self
 
-    def add_firewall_zone(self, zone: 'FirewallZone') -> 'UCIConfig':
+    def add_firewall_zone(self, zone: "FirewallZone") -> "UCIConfig":
         """Add a firewall zone to the configuration."""
         self.firewall.add_zone(zone)
         return self
 
-    def add_firewall_forwarding(self, forwarding: 'FirewallForwarding') -> 'UCIConfig':
+    def add_firewall_forwarding(self, forwarding: "FirewallForwarding") -> "UCIConfig":
         """Add a firewall forwarding rule to the configuration."""
         self.firewall.add_forwarding(forwarding)
         return self
 
-    def add_sqm_queue(self, queue: 'SQMQueue') -> 'UCIConfig':
+    def add_sqm_queue(self, queue: "SQMQueue") -> "UCIConfig":
         """Add an SQM queue to the configuration."""
         self.sqm.add_queue(queue)
         return self
@@ -514,7 +537,11 @@ class UCIConfig:
                 if len(parts) >= 2:
                     option_name = line.split()[1].strip("'")
                     option_value = parts[1]
-                    commands.append(UCICommand("set", f"{package}.{current_section}.{option_name}", option_value))
+                    commands.append(
+                        UCICommand(
+                            "set", f"{package}.{current_section}.{option_name}", option_value
+                        )
+                    )
 
             # List: \tlist <name> '<value>'
             elif line.startswith("\tlist ") and current_section:
@@ -523,7 +550,11 @@ class UCIConfig:
                     list_name = line.split()[1].strip("'")
                     list_value = parts[1]
                     # For lists, we use add_list command
-                    commands.append(UCICommand("add_list", f"{package}.{current_section}.{list_name}", list_value))
+                    commands.append(
+                        UCICommand(
+                            "add_list", f"{package}.{current_section}.{list_name}", list_value
+                        )
+                    )
 
         return commands
 
@@ -641,7 +672,9 @@ class UCIConfig:
                     remote_paths = {c.path for c in remote_commands if c.action == "set"}
                     if cmd.path in remote_paths:
                         # Find the remote command with same path
-                        remote_cmd = next(c for c in remote_commands if c.path == cmd.path and c.action == "set")
+                        remote_cmd = next(
+                            c for c in remote_commands if c.path == cmd.path and c.action == "set"
+                        )
                         diff.to_modify.append((remote_cmd, cmd))
                     else:
                         diff.to_add.append(cmd)
@@ -735,9 +768,7 @@ class UCIConfig:
                 if exit_code != 0:
                     if progress:
                         progress.finish(f"✗ Failed at command: {cmd.to_string()}")
-                    raise RuntimeError(
-                        f"Failed to execute command '{cmd.to_string()}': {stderr}"
-                    )
+                    raise RuntimeError(f"Failed to execute command '{cmd.to_string()}': {stderr}")
 
             # Commit changes
             if auto_commit:
@@ -874,9 +905,7 @@ class UCIConfig:
                 if exit_code != 0:
                     if progress:
                         progress.finish(f"✗ Failed at command: {cmd.to_string()}")
-                    raise RuntimeError(
-                        f"Failed to execute command '{cmd.to_string()}': {stderr}"
-                    )
+                    raise RuntimeError(f"Failed to execute command '{cmd.to_string()}': {stderr}")
 
             # Commit changes
             if auto_commit:
@@ -900,7 +929,9 @@ class UCIConfig:
 
         return diff
 
-    def save_to_file(self, filename: str, include_commit: bool = True, include_reload: bool = True) -> None:
+    def save_to_file(
+        self, filename: str, include_commit: bool = True, include_reload: bool = True
+    ) -> None:
         """
         Save the configuration to a shell script file.
 
@@ -934,59 +965,53 @@ class UCIConfig:
                     "properties": {
                         "devices": {
                             "type": "object",
-                            "additionalProperties": NetworkDevice.json_schema()
+                            "additionalProperties": NetworkDevice.json_schema(),
                         },
                         "interfaces": {
                             "type": "object",
-                            "additionalProperties": NetworkInterface.json_schema()
-                        }
-                    }
+                            "additionalProperties": NetworkInterface.json_schema(),
+                        },
+                    },
                 },
                 "wireless": {
                     "type": "object",
                     "properties": {
                         "radios": {
                             "type": "object",
-                            "additionalProperties": WirelessRadio.json_schema()
+                            "additionalProperties": WirelessRadio.json_schema(),
                         },
                         "interfaces": {
                             "type": "object",
-                            "additionalProperties": WirelessInterface.json_schema()
-                        }
-                    }
+                            "additionalProperties": WirelessInterface.json_schema(),
+                        },
+                    },
                 },
                 "dhcp": {
                     "type": "object",
                     "properties": {
                         "sections": {
                             "type": "object",
-                            "additionalProperties": DHCPSection.json_schema()
+                            "additionalProperties": DHCPSection.json_schema(),
                         }
-                    }
+                    },
                 },
                 "firewall": {
                     "type": "object",
                     "properties": {
                         "zones": {
                             "type": "object",
-                            "additionalProperties": FirewallZone.json_schema()
+                            "additionalProperties": FirewallZone.json_schema(),
                         },
-                        "forwardings": {
-                            "type": "array",
-                            "items": FirewallForwarding.json_schema()
-                        }
-                    }
+                        "forwardings": {"type": "array", "items": FirewallForwarding.json_schema()},
+                    },
                 },
                 "sqm": {
                     "type": "object",
                     "properties": {
-                        "queues": {
-                            "type": "object",
-                            "additionalProperties": SQMQueue.json_schema()
-                        }
-                    }
-                }
-            }
+                        "queues": {"type": "object", "additionalProperties": SQMQueue.json_schema()}
+                    },
+                },
+            },
         }
 
     @classmethod
@@ -1029,7 +1054,9 @@ class UCIConfig:
             if self.network.interfaces:
                 interfaces_dict = {}
                 for interface in self.network.interfaces:
-                    interfaces_dict[interface._section] = interface.to_dict(exclude_none=exclude_none)
+                    interfaces_dict[interface._section] = interface.to_dict(
+                        exclude_none=exclude_none
+                    )
                 network_dict["interfaces"] = interfaces_dict
 
             result["network"] = network_dict
@@ -1128,7 +1155,7 @@ class UCIConfig:
             exclude_none: Whether to exclude None values
         """
         json_str = self.to_json(indent=indent, exclude_none=exclude_none)
-        with open(filename, 'w') as f:
+        with open(filename, "w") as f:
             f.write(json_str)
 
     def to_yaml_file(self, filename: str, exclude_none: bool = True) -> None:
@@ -1140,7 +1167,7 @@ class UCIConfig:
             exclude_none: Whether to exclude None values
         """
         yaml_str = self.to_yaml(exclude_none=exclude_none)
-        with open(filename, 'w') as f:
+        with open(filename, "w") as f:
             f.write(yaml_str)
 
     # Deserialization methods
@@ -1258,7 +1285,9 @@ class UCIConfig:
         omega_conf = OmegaConf.create(yaml_str)
         # Convert to regular Python dict for Pydantic validation
         data = OmegaConf.to_container(omega_conf, resolve=True)
-        return cls.from_dict(data)
+        if not isinstance(data, dict):
+            raise ValueError("YAML content must be a dictionary")
+        return cls.from_dict(cast(Dict[str, Any], data))
 
     @classmethod
     def from_json_file(cls, filename: str) -> "UCIConfig":
@@ -1271,7 +1300,7 @@ class UCIConfig:
         Returns:
             UCIConfig instance
         """
-        with open(filename, 'r') as f:
+        with open(filename, "r") as f:
             return cls.from_json(f.read())
 
     @classmethod
@@ -1285,5 +1314,5 @@ class UCIConfig:
         Returns:
             UCIConfig instance
         """
-        with open(filename, 'r') as f:
+        with open(filename, "r") as f:
             return cls.from_yaml(f.read())

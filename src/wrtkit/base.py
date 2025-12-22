@@ -3,7 +3,7 @@
 from typing import Any, Dict, List, Optional, Type, TypeVar
 from pydantic import BaseModel, ConfigDict
 
-T = TypeVar('T', bound='UCISection')
+T = TypeVar("T", bound="UCISection")
 
 
 class UCICommand:
@@ -33,11 +33,7 @@ class UCICommand:
     def __eq__(self, other: object) -> bool:
         if not isinstance(other, UCICommand):
             return False
-        return (
-            self.action == other.action
-            and self.path == other.path
-            and self.value == other.value
-        )
+        return self.action == other.action and self.path == other.path and self.value == other.value
 
 
 class UCISection(BaseModel):
@@ -69,9 +65,7 @@ class UCISection(BaseModel):
         commands = []
 
         # Set section type
-        commands.append(
-            UCICommand("set", f"{self._package}.{self._section}", self._section_type)
-        )
+        commands.append(UCICommand("set", f"{self._package}.{self._section}", self._section_type))
 
         # Get all fields except private ones (starting with _)
         for field_name, field_value in self.model_dump(exclude_none=True).items():
@@ -85,7 +79,7 @@ class UCISection(BaseModel):
                         UCICommand(
                             "add_list",
                             f"{self._package}.{self._section}.{field_name}",
-                            self._get_option_value(item)
+                            self._get_option_value(item),
                         )
                     )
             else:
@@ -94,7 +88,7 @@ class UCISection(BaseModel):
                     UCICommand(
                         "set",
                         f"{self._package}.{self._section}.{field_name}",
-                        self._get_option_value(field_value)
+                        self._get_option_value(field_value),
                     )
                 )
 
@@ -114,7 +108,7 @@ class UCISection(BaseModel):
         """
         schema = cls.model_json_schema()
         if title:
-            schema['title'] = title
+            schema["title"] = title
         return schema
 
     @classmethod
@@ -131,6 +125,7 @@ class UCISection(BaseModel):
             JSON Schema in YAML format as a string
         """
         import yaml
+
         schema = cls.json_schema(title)
         return yaml.dump(schema, default_flow_style=False, sort_keys=False)
 
@@ -148,10 +143,12 @@ class UCISection(BaseModel):
         """
         data = self.model_dump(exclude_none=exclude_none)
         if exclude_private:
-            data = {k: v for k, v in data.items() if not k.startswith('_')}
+            data = {k: v for k, v in data.items() if not k.startswith("_")}
         return data
 
-    def to_json(self, exclude_none: bool = True, exclude_private: bool = True, indent: int = 2) -> str:
+    def to_json(
+        self, exclude_none: bool = True, exclude_private: bool = True, indent: int = 2
+    ) -> str:
         """
         Convert this model to JSON string.
 
@@ -164,6 +161,7 @@ class UCISection(BaseModel):
             JSON string representation
         """
         import json
+
         data = self.to_dict(exclude_none, exclude_private)
         return json.dumps(data, indent=indent)
 
@@ -179,6 +177,7 @@ class UCISection(BaseModel):
             YAML string representation
         """
         import yaml
+
         data = self.to_dict(exclude_none, exclude_private)
         return yaml.dump(data, default_flow_style=False, sort_keys=False)
 
@@ -210,6 +209,7 @@ class UCISection(BaseModel):
             Instance of this model
         """
         import json
+
         data = json.loads(json_str)
         return cls.from_dict(data, section_name)
 
@@ -226,6 +226,7 @@ class UCISection(BaseModel):
             Instance of this model
         """
         import yaml
+
         data = yaml.safe_load(yaml_str)
         return cls.from_dict(data, section_name)
 
@@ -241,7 +242,7 @@ class UCISection(BaseModel):
         Returns:
             Instance of this model
         """
-        with open(filename, 'r') as f:
+        with open(filename, "r") as f:
             return cls.from_json(f.read(), section_name)
 
     @classmethod
@@ -256,10 +257,16 @@ class UCISection(BaseModel):
         Returns:
             Instance of this model
         """
-        with open(filename, 'r') as f:
+        with open(filename, "r") as f:
             return cls.from_yaml(f.read(), section_name)
 
-    def to_json_file(self, filename: str, exclude_none: bool = True, exclude_private: bool = True, indent: int = 2) -> None:
+    def to_json_file(
+        self,
+        filename: str,
+        exclude_none: bool = True,
+        exclude_private: bool = True,
+        indent: int = 2,
+    ) -> None:
         """
         Save this model to JSON file.
 
@@ -270,10 +277,12 @@ class UCISection(BaseModel):
             indent: Indentation level for pretty printing
         """
         json_str = self.to_json(exclude_none, exclude_private, indent)
-        with open(filename, 'w') as f:
+        with open(filename, "w") as f:
             f.write(json_str)
 
-    def to_yaml_file(self, filename: str, exclude_none: bool = True, exclude_private: bool = True) -> None:
+    def to_yaml_file(
+        self, filename: str, exclude_none: bool = True, exclude_private: bool = True
+    ) -> None:
         """
         Save this model to YAML file.
 
@@ -283,5 +292,5 @@ class UCISection(BaseModel):
             exclude_private: Whether to exclude fields starting with _
         """
         yaml_str = self.to_yaml(exclude_none, exclude_private)
-        with open(filename, 'w') as f:
+        with open(filename, "w") as f:
             f.write(yaml_str)

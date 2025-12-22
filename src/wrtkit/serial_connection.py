@@ -88,7 +88,9 @@ class SerialConnection:
             time.sleep(0.5)
 
             # Check for password prompt
-            output = self._serial.read(self._serial.in_waiting or 1).decode('utf-8', errors='ignore')
+            output = self._serial.read(self._serial.in_waiting or 1).decode(
+                "utf-8", errors="ignore"
+            )
 
             if "password:" in output.lower() and self.login_password:
                 self._serial.write(f"{self.login_password}\n".encode())
@@ -111,7 +113,7 @@ class SerialConnection:
 
         while time.time() - start_time < timeout:
             if self._serial.in_waiting:
-                chunk = self._serial.read(self._serial.in_waiting).decode('utf-8', errors='ignore')
+                chunk = self._serial.read(self._serial.in_waiting).decode("utf-8", errors="ignore")
                 output += chunk
 
                 # Check for prompt or login
@@ -133,7 +135,7 @@ class SerialConnection:
 
         while time.time() - start_time < timeout:
             if self._serial.in_waiting:
-                chunk = self._serial.read(self._serial.in_waiting).decode('utf-8', errors='ignore')
+                chunk = self._serial.read(self._serial.in_waiting).decode("utf-8", errors="ignore")
                 output += chunk
 
                 # Check if we have a prompt
@@ -176,7 +178,7 @@ class SerialConnection:
         output = self._wait_for_prompt()
 
         # Remove the echoed command from the output
-        lines = output.split('\n')
+        lines = output.split("\n")
         # Filter out the command echo and prompt lines
         filtered_lines = []
         for line in lines:
@@ -185,7 +187,7 @@ class SerialConnection:
                 continue
             filtered_lines.append(line)
 
-        stdout = '\n'.join(filtered_lines).strip()
+        stdout = "\n".join(filtered_lines).strip()
 
         # Get exit code by running a separate command
         self._serial.write(b"echo $?\n")
@@ -194,7 +196,7 @@ class SerialConnection:
 
         # Extract exit code
         exit_code = 0
-        for line in exit_output.split('\n'):
+        for line in exit_output.split("\n"):
             line = line.strip()
             if line.isdigit():
                 exit_code = int(line)
