@@ -8,6 +8,7 @@ from .network import NetworkConfig, NetworkInterface, NetworkDevice
 from .wireless import WirelessConfig, WirelessRadio, WirelessInterface
 from .dhcp import DHCPConfig, DHCPSection
 from .firewall import FirewallConfig, FirewallZone, FirewallForwarding
+from .sqm import SQMConfig, SQMQueue
 from .ssh import SSHConnection
 from .progress import Spinner, ProgressBar
 
@@ -378,6 +379,7 @@ class UCIConfig:
         self.wireless = WirelessConfig()
         self.dhcp = DHCPConfig()
         self.firewall = FirewallConfig()
+        self.sqm = SQMConfig()
 
     # Convenience methods to maintain backward compatibility
     def add_network_interface(self, interface: 'NetworkInterface') -> 'UCIConfig':
@@ -415,6 +417,11 @@ class UCIConfig:
         self.firewall.add_forwarding(forwarding)
         return self
 
+    def add_sqm_queue(self, queue: 'SQMQueue') -> 'UCIConfig':
+        """Add an SQM queue to the configuration."""
+        self.sqm.add_queue(queue)
+        return self
+
     def get_all_commands(self) -> List[UCICommand]:
         """Get all UCI commands from all configuration sections."""
         commands = []
@@ -422,6 +429,7 @@ class UCIConfig:
         commands.extend(self.wireless.get_commands())
         commands.extend(self.dhcp.get_commands())
         commands.extend(self.firewall.get_commands())
+        commands.extend(self.sqm.get_commands())
         return commands
 
     def to_script(self, include_commit: bool = True, include_reload: bool = True) -> str:
@@ -531,7 +539,7 @@ class UCIConfig:
             spinner: Optional spinner to update with progress
         """
         commands = []
-        packages = ["network", "wireless", "dhcp", "firewall"]
+        packages = ["network", "wireless", "dhcp", "firewall", "sqm"]
 
         for package in packages:
             if spinner:
@@ -967,6 +975,15 @@ class UCIConfig:
                             "items": FirewallForwarding.json_schema()
                         }
                     }
+                },
+                "sqm": {
+                    "type": "object",
+                    "properties": {
+                        "queues": {
+                            "type": "object",
+                            "additionalProperties": SQMQueue.json_schema()
+                        }
+                    }
                 }
             }
         }
@@ -1061,6 +1078,15 @@ class UCIConfig:
                 firewall_dict["forwardings"] = forwardings_list
 
             result["firewall"] = firewall_dict
+
+        # SQM configuration
+        if self.sqm.queues:
+            sqm_dict: Dict[str, Any] = {}
+            queues_dict = {}
+            for queue in self.sqm.queues:
+                queues_dict[queue._section] = queue.to_dict(exclude_none=exclude_none)
+            sqm_dict["queues"] = queues_dict
+            result["sqm"] = sqm_dict
 
         return result
 
@@ -1190,6 +1216,15 @@ class UCIConfig:
                     forwarding_data.pop("index", None)
                     forwarding = FirewallForwarding(idx, **forwarding_data)
                     config.firewall.add_forwarding(forwarding)
+
+        # Load SQM configuration
+        if "sqm" in data:
+            sqm_data = data["sqm"]
+
+            if "queues" in sqm_data:
+                for queue_name, queue_data in sqm_data["queues"].items():
+                    queue = SQMQueue(queue_name, **queue_data)
+                    config.sqm.add_queue(queue)
 
         return config
 

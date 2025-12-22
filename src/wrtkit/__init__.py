@@ -7,6 +7,7 @@ from .network import NetworkConfig, NetworkDevice, NetworkInterface
 from .wireless import WirelessConfig, WirelessRadio, WirelessInterface
 from .dhcp import DHCPConfig, DHCPSection
 from .firewall import FirewallConfig, FirewallZone, FirewallForwarding
+from .sqm import SQMConfig, SQMQueue
 from .mesh import (
     Client,
     MeshNode,
@@ -34,6 +35,8 @@ __all__ = [
     "FirewallConfig",
     "FirewallZone",
     "FirewallForwarding",
+    "SQMConfig",
+    "SQMQueue",
     # Mesh network info
     "Client",
     "MeshNode",
