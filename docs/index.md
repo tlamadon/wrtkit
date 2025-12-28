@@ -4,6 +4,9 @@
 
 ## Features
 
+:material-console: **Command Line Interface**
+:   Manage devices directly from your terminal with `wrtkit preview` and `wrtkit apply`
+
 :material-language-python: **Pythonic API**
 :   Define OpenWRT configurations using Python with a fluent builder pattern
 
@@ -81,6 +84,7 @@ pip install wrtkit
 ## Next Steps
 
 - [Installation Guide](getting-started/installation.md)
+- [Command Line Interface](guide/cli.md)
 - [Quick Start Tutorial](getting-started/quick-start.md)
 - [API Reference](api/config.md)
 - [Examples](examples/basic-router.md)

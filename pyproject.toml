@@ -32,6 +32,8 @@ dependencies = [
     "pydantic>=2.0.0",
     "pyyaml>=6.0.0",
     "omegaconf>=2.3.0",
+    "click>=8.0.0",
+    "python-dotenv>=1.0.0",
 ]
 
 [project.optional-dependencies]
@@ -50,6 +52,9 @@ docs = [
     "mkdocs-material>=9.0.0",
     "mkdocstrings[python]>=0.24.0",
 ]
+
+[project.scripts]
+wrtkit = "wrtkit.cli:main"
 
 [project.urls]
 Homepage = "https://github.com/tlamadon/wrtkit"

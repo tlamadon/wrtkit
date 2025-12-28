@@ -81,6 +81,7 @@ nav:
     - Quick Start: getting-started/quick-start.md
     - Your First Config: getting-started/first-config.md
   - User Guide:
+    - Command Line Interface: guide/cli.md
     - Network Configuration: guide/network.md
     - Wireless Configuration: guide/wireless.md
     - DHCP Configuration: guide/dhcp.md

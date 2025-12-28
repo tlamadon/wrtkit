@@ -1,7 +1,7 @@
 """Mesh network information collection and visualization."""
 
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Dict, List, Literal, Optional
 
 from pydantic import BaseModel
@@ -33,12 +33,14 @@ class MeshNode(BaseModel):
     hostname: Optional[str] = None
     clients: List[Client] = []
     interfaces: Dict[str, str] = {}  # interface -> SSID mapping
+    warnings: List[str] = []  # Warnings about missing tools or other issues
 
 
 class MeshNetwork(BaseModel):
     """Represents the entire mesh network."""
 
     nodes: List[MeshNode] = []
+    warnings: List[str] = []  # Network-wide warnings
 
 
 @dataclass
@@ -322,30 +324,49 @@ def _get_batman_originators(connection: SSHConnection) -> Dict[str, str]:
     return originators
 
 
-def _get_bridge_port_mapping(connection: SSHConnection) -> Dict[str, str]:
+def _get_bridge_port_mapping(
+    connection: SSHConnection,
+) -> tuple[Dict[str, str], List[str]]:
     """
     Get mapping of MAC addresses to the physical port/device they're connected to.
 
     Uses 'bridge fdb show' to determine which bridge port learned each MAC.
 
-    Returns: Dict mapping MAC (lowercase) to device name (e.g., 'lan1', 'eth0.1')
+    Returns:
+        Tuple of:
+        - Dict mapping MAC (lowercase) to device name (e.g., 'lan1', 'eth0.1')
+        - List of warning messages (e.g., missing executables)
     """
     mac_to_device: Dict[str, str] = {}
+    warnings: List[str] = []
+
+    # Check if 'bridge' command exists
+    bridge_check, _, bridge_exit = connection.execute("command -v bridge")
+    bridge_available = bridge_exit == 0 and bridge_check.strip()
+
+    # Check if 'brctl' command exists
+    brctl_check, _, brctl_exit = connection.execute("command -v brctl")
+    brctl_available = brctl_exit == 0 and brctl_check.strip()
 
     # Method 1: Use 'bridge fdb show' (modern Linux)
-    stdout, _, exit_code = connection.execute("bridge fdb show 2>/dev/null")
-    if exit_code == 0 and stdout.strip():
-        mac_to_device = _parse_bridge_fdb(stdout)
+    if bridge_available:
+        stdout, _, exit_code = connection.execute("bridge fdb show 2>/dev/null")
+        if exit_code == 0 and stdout.strip():
+            mac_to_device = _parse_bridge_fdb(stdout)
 
     # Method 2: Fallback to brctl showmacs for each bridge
-    if not mac_to_device:
+    if not mac_to_device and brctl_available:
         # Find all bridges
-        stdout, _, _ = connection.execute("ls /sys/class/net/*/bridge 2>/dev/null | cut -d/ -f5")
+        stdout, _, _ = connection.execute(
+            "ls /sys/class/net/*/bridge 2>/dev/null | cut -d/ -f5"
+        )
         bridges = [b.strip() for b in stdout.split("\n") if b.strip()]
 
         for bridge in bridges:
             # Get port number to interface mapping
-            stdout, _, _ = connection.execute(f"ls /sys/class/net/{bridge}/brif/ 2>/dev/null")
+            stdout, _, _ = connection.execute(
+                f"ls /sys/class/net/{bridge}/brif/ 2>/dev/null"
+            )
             port_ifaces = [p.strip() for p in stdout.split("\n") if p.strip()]
 
             # Get port numbers
@@ -363,7 +384,9 @@ def _get_bridge_port_mapping(connection: SSHConnection) -> Dict[str, str]:
                         pass
 
             # Now get MACs from brctl
-            stdout, _, exit_code = connection.execute(f"brctl showmacs {bridge} 2>/dev/null")
+            stdout, _, exit_code = connection.execute(
+                f"brctl showmacs {bridge} 2>/dev/null"
+            )
             if exit_code == 0:
                 for line in stdout.split("\n"):
                     if line.startswith("port no") or not line.strip():
@@ -376,7 +399,18 @@ def _get_bridge_port_mapping(connection: SSHConnection) -> Dict[str, str]:
                         if is_local == "no" and port_no in port_to_iface:
                             mac_to_device[mac] = port_to_iface[port_no]
 
-    return mac_to_device
+    # Generate warning if no bridge tools are available
+    if not bridge_available and not brctl_available:
+        warnings.append(
+            "LAN client detection unavailable: neither 'bridge' nor 'brctl' command found. "
+            "Install with: opkg install ip-full (for 'bridge') or opkg install bridge-utils (for 'brctl')"
+        )
+    elif not mac_to_device and (bridge_available or brctl_available):
+        # Tools exist but no FDB entries found - this might be normal (no LAN clients)
+        # or could indicate a problem. We don't warn here as it's not necessarily an error.
+        pass
+
+    return mac_to_device, warnings
 
 
 def _get_interface_ssids(connection: SSHConnection) -> Dict[str, str]:
@@ -522,6 +556,7 @@ class _NodeRawData:
     bridge_fdb: Dict[str, str]  # MAC -> physical port/device
     batman_tt: Dict[str, str]  # client MAC -> originator MAC (mesh node)
     node_mac: Optional[str] = None  # This node's batman originator MAC
+    warnings: List[str] = field(default_factory=list)  # Warnings about missing tools
 
 
 def _get_node_batman_mac(connection: SSHConnection) -> Optional[str]:
@@ -610,11 +645,15 @@ def _collect_node_raw_data(connection: SSHConnection) -> _NodeRawData:
     arp_table = _parse_arp_table(stdout)
 
     # Collect bridge forwarding database (to know which port clients are on)
-    bridge_fdb = _get_bridge_port_mapping(connection)
+    bridge_fdb, bridge_warnings = _get_bridge_port_mapping(connection)
 
     # Collect BATMAN-ADV translation table (to know which node a client is behind)
     batman_tt = _get_batman_translation_table(connection)
     node_mac = _get_node_batman_mac(connection)
+
+    # Collect all warnings
+    warnings: List[str] = []
+    warnings.extend(bridge_warnings)
 
     wifi_clients: List[Client] = []
 
@@ -655,6 +694,7 @@ def _collect_node_raw_data(connection: SSHConnection) -> _NodeRawData:
         bridge_fdb=bridge_fdb,
         batman_tt=batman_tt,
         node_mac=node_mac,
+        warnings=warnings,
     )
 
 
@@ -700,6 +740,7 @@ def collect_node_info(connection: SSHConnection) -> MeshNode:
         hostname=raw.hostname,
         clients=clients,
         interfaces=raw.interface_ssids,
+        warnings=raw.warnings,
     )
 
 
@@ -933,10 +974,20 @@ def collect_mesh_network(
                 hostname=raw.hostname,
                 clients=clients,
                 interfaces=raw.interface_ssids,
+                warnings=raw.warnings,
             )
         )
 
-    return MeshNetwork(nodes=nodes)
+    # Collect network-wide warnings (deduplicate across nodes)
+    all_warnings: List[str] = []
+    seen_warnings: set = set()
+    for node in nodes:
+        for warning in node.warnings:
+            if warning not in seen_warnings:
+                all_warnings.append(warning)
+                seen_warnings.add(warning)
+
+    return MeshNetwork(nodes=nodes, warnings=all_warnings)
 
 
 def display_mesh_tree(network: MeshNetwork, use_color: bool = False) -> str:
@@ -1051,5 +1102,13 @@ def display_mesh_tree(network: MeshNetwork, use_color: bool = False) -> str:
                         client_info = f"{DIM}(stale) {client_info}{RESET}"
 
                     lines.append(f"{child_prefix}{client_prefix}{client_line_prefix}{client_info}")
+
+    # Display warnings at the end
+    if network.warnings:
+        RED = "\033[31m" if use_color else ""
+        lines.append("")
+        lines.append(f"{RED}Warnings:{RESET}")
+        for warning in network.warnings:
+            lines.append(f"  - {warning}")
 
     return "\n".join(lines)
