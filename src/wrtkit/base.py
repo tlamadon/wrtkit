@@ -27,6 +27,25 @@ class UCICommand:
         else:
             raise ValueError(f"Unknown action: {self.action}")
 
+    def to_string_with_value(self, display_value: str) -> str:
+        """Convert command to UCI string format with a custom display value.
+
+        This is useful for masking sensitive values in output.
+
+        Args:
+            display_value: The value to display instead of the actual value
+        """
+        if self.action == "set":
+            return f"uci set {self.path}='{display_value}'"
+        elif self.action == "add_list":
+            return f"uci add_list {self.path}='{display_value}'"
+        elif self.action == "del_list":
+            return f"uci del_list {self.path}='{display_value}'"
+        elif self.action == "delete":
+            return f"uci delete {self.path}"
+        else:
+            raise ValueError(f"Unknown action: {self.action}")
+
     def __repr__(self) -> str:
         return f"UCICommand({self.action}, {self.path}, {self.value})"
 

@@ -27,6 +27,63 @@ class Colors:
     DIM = "\033[2m"  # Dim text
 
 
+# Field names that contain sensitive data and should be masked
+SENSITIVE_FIELDS = frozenset({
+    "key",           # WiFi WPA key
+    "password",      # Generic password
+    "wpakey",        # WPA key variant
+    "sae_password",  # WPA3 SAE password
+    "psk",           # Pre-shared key
+    "secret",        # Generic secret
+    "auth_secret",   # Authentication secret
+    "priv_passwd",   # SNMP private password
+    "auth_passwd",   # SNMP auth password
+})
+
+
+def mask_sensitive_value(value: Any, visible_chars: int = 3) -> str:
+    """
+    Mask a sensitive value, showing only the first few characters.
+
+    Args:
+        value: The value to mask
+        visible_chars: Number of characters to show at the start (default: 3)
+
+    Returns:
+        Masked string like "abc*****" or the original value if too short
+    """
+    if value is None:
+        return "None"
+
+    str_value = str(value)
+    if len(str_value) <= visible_chars:
+        # Don't mask very short values as it would reveal the length
+        return "*" * len(str_value)
+
+    return str_value[:visible_chars] + "*" * (len(str_value) - visible_chars)
+
+
+def get_display_value(path: str, value: Any) -> str:
+    """
+    Get a display-safe value, masking sensitive fields.
+
+    Args:
+        path: The UCI path (e.g., "wireless.wlan0.key")
+        value: The value to display
+
+    Returns:
+        The value as string, possibly masked if it's a sensitive field
+    """
+    # Extract the field name from the path (last component)
+    parts = path.split(".")
+    field_name = parts[-1] if parts else ""
+
+    if field_name.lower() in SENSITIVE_FIELDS:
+        return mask_sensitive_value(value)
+
+    return str(value) if value is not None else "None"
+
+
 class ConfigDiff:
     """Represents the difference between two configurations."""
 
@@ -199,23 +256,28 @@ class ConfigDiff:
         if self.to_add:
             lines.append("Commands to add:")
             for cmd in self.to_add:
-                lines.append(f"  {add_prefix} {cmd.to_string()}")
+                display_val = get_display_value(cmd.path, cmd.value)
+                lines.append(f"  {add_prefix} {cmd.to_string_with_value(display_val)}")
 
         if self.to_remove:
             lines.append("\nCommands to remove:")
             for cmd in self.to_remove:
-                lines.append(f"  {remove_prefix} {cmd.to_string()}")
+                display_val = get_display_value(cmd.path, cmd.value)
+                lines.append(f"  {remove_prefix} {cmd.to_string_with_value(display_val)}")
 
         if self.to_modify:
             lines.append("\nCommands to modify:")
             for old_cmd, new_cmd in self.to_modify:
-                lines.append(f"  {remove_prefix} {old_cmd.to_string()}")
-                lines.append(f"  {add_prefix} {new_cmd.to_string()}")
+                old_display_val = get_display_value(old_cmd.path, old_cmd.value)
+                new_display_val = get_display_value(new_cmd.path, new_cmd.value)
+                lines.append(f"  {remove_prefix} {old_cmd.to_string_with_value(old_display_val)}")
+                lines.append(f"  {add_prefix} {new_cmd.to_string_with_value(new_display_val)}")
 
         if self.remote_only:
             lines.append("\nRemote-only settings (not managed by config):")
             for cmd in self.remote_only:
-                lines.append(f"  {remote_prefix} {cmd.to_string()}")
+                display_val = get_display_value(cmd.path, cmd.value)
+                lines.append(f"  {remote_prefix} {cmd.to_string_with_value(display_val)}")
 
         # Summary footer
         summary_parts = []
@@ -339,7 +401,8 @@ class ConfigDiff:
                             if len(cmd.path.split(".")) > 2
                             else cmd.path
                         )
-                        lines.append(f"{item_prefix}  {add_sym} {option} = {cmd.value}")
+                        display_val = get_display_value(cmd.path, cmd.value)
+                        lines.append(f"{item_prefix}  {add_sym} {option} = {display_val}")
 
                 # Add commands to remove
                 if package in remove_grouped and section in remove_grouped[package]:
@@ -349,7 +412,8 @@ class ConfigDiff:
                             if len(cmd.path.split(".")) > 2
                             else cmd.path
                         )
-                        lines.append(f"{item_prefix}  {remove_sym} {option} = {cmd.value}")
+                        display_val = get_display_value(cmd.path, cmd.value)
+                        lines.append(f"{item_prefix}  {remove_sym} {option} = {display_val}")
 
                 # Add commands to modify
                 if package in modify_grouped and section in modify_grouped[package]:
@@ -359,9 +423,11 @@ class ConfigDiff:
                             if len(new_cmd.path.split(".")) > 2
                             else new_cmd.path
                         )
+                        old_display_val = get_display_value(old_cmd.path, old_cmd.value)
+                        new_display_val = get_display_value(new_cmd.path, new_cmd.value)
                         lines.append(f"{item_prefix}  {modify_sym} {option}")
-                        lines.append(f"{item_prefix}    {remove_sym} {old_cmd.value}")
-                        lines.append(f"{item_prefix}    {add_sym} {new_cmd.value}")
+                        lines.append(f"{item_prefix}    {remove_sym} {old_display_val}")
+                        lines.append(f"{item_prefix}    {add_sym} {new_display_val}")
 
                 # Add remote-only commands
                 if package in remote_only_grouped and section in remote_only_grouped[package]:
@@ -371,8 +437,9 @@ class ConfigDiff:
                             if len(cmd.path.split(".")) > 2
                             else cmd.path
                         )
+                        display_val = get_display_value(cmd.path, cmd.value)
                         lines.append(
-                            f"{item_prefix}  {remote_sym} {option} = {cmd.value} {remote_label}"
+                            f"{item_prefix}  {remote_sym} {option} = {display_val} {remote_label}"
                         )
 
         # Summary footer

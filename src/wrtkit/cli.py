@@ -8,7 +8,7 @@ from typing import Optional, Union, Any
 import click
 from dotenv import load_dotenv
 
-from .config import UCIConfig, ConfigDiff
+from .config import UCIConfig, ConfigDiff, get_display_value
 from .ssh import SSHConnection
 from .serial_connection import SerialConnection
 from .network import NetworkDevice, NetworkInterface
@@ -238,29 +238,37 @@ def _import_remote_config(conn: Connection) -> UCIConfig:
 
 
 def format_commands(diff: ConfigDiff, show_all: bool = False) -> str:
-    """Format UCI commands from a diff for display."""
+    """Format UCI commands from a diff for display.
+
+    Sensitive values (passwords, keys) are masked for security.
+    """
     lines = []
 
     if diff.to_add:
         lines.append("# Commands to add:")
         for cmd in diff.to_add:
-            lines.append(cmd.to_string())
+            display_val = get_display_value(cmd.path, cmd.value)
+            lines.append(cmd.to_string_with_value(display_val))
 
     if diff.to_modify:
         lines.append("\n# Commands to modify (new values):")
         for old_cmd, new_cmd in diff.to_modify:
-            lines.append(f"# was: {old_cmd.to_string()}")
-            lines.append(new_cmd.to_string())
+            old_display_val = get_display_value(old_cmd.path, old_cmd.value)
+            new_display_val = get_display_value(new_cmd.path, new_cmd.value)
+            lines.append(f"# was: {old_cmd.to_string_with_value(old_display_val)}")
+            lines.append(new_cmd.to_string_with_value(new_display_val))
 
     if diff.to_remove:
         lines.append("\n# Commands to remove:")
         for cmd in diff.get_removal_commands():
-            lines.append(cmd.to_string())
+            display_val = get_display_value(cmd.path, cmd.value) if cmd.value else ""
+            lines.append(cmd.to_string_with_value(display_val))
 
     if show_all and diff.remote_only:
         lines.append("\n# Remote-only settings (not in config):")
         for cmd in diff.remote_only:
-            lines.append(f"# {cmd.to_string()}")
+            display_val = get_display_value(cmd.path, cmd.value)
+            lines.append(f"# {cmd.to_string_with_value(display_val)}")
 
     return "\n".join(lines)
 

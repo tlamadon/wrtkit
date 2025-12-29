@@ -1,10 +1,10 @@
 site_name: WRTKit Documentation
 site_description: A Python library for managing OpenWRT configuration over SSH
 site_author: WRTKit Contributors
-site_url: https://yourusername.github.io/wrtkit
+site_url: https://tlamadon.github.io/wrtkit
 
-repo_name: yourusername/wrtkit
-repo_url: https://github.com/yourusername/wrtkit
+repo_name: tlamadon/wrtkit
+repo_url: https://github.com/tlamadon/wrtkit
 edit_uri: edit/main/docs/
 
 theme:
