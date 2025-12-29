@@ -205,6 +205,81 @@ scp deploy.sh root@192.168.1.1:/tmp/
 ssh root@192.168.1.1 "sh /tmp/deploy.sh"
 ```
 
+### `wrtkit import`
+
+Import the current configuration from a remote device and save it as a YAML or JSON file. This is useful for:
+
+- Backing up router configurations
+- Creating a baseline config from an existing router
+- Cloning configurations to other devices
+
+```bash
+wrtkit import TARGET OUTPUT_FILE [OPTIONS]
+```
+
+**Arguments:**
+
+| Argument | Description |
+|----------|-------------|
+| `TARGET` | Device to import from (IP, hostname, or serial port) |
+| `OUTPUT_FILE` | Where to save the configuration (.yaml or .json) |
+
+**Options:**
+
+| Option | Description |
+|--------|-------------|
+| `-p, --password TEXT` | SSH/login password |
+| `-k, --key-file PATH` | SSH private key file |
+| `-t, --timeout INTEGER` | Connection timeout in seconds (default: 30) |
+| `--format [yaml\|json]` | Output format (auto-detected from extension) |
+| `--packages TEXT` | Comma-separated packages to import (default: all) |
+
+**Examples:**
+
+```bash
+# Import full config from router
+wrtkit import 192.168.1.1 router-backup.yaml
+
+# Import as JSON
+wrtkit import router.local config.json
+
+# Import only network and wireless config
+wrtkit import 192.168.1.1 minimal.yaml --packages network,wireless
+
+# Import with password
+wrtkit import 192.168.1.1 backup.yaml -p mypassword
+
+# Clone config to another router
+wrtkit import 192.168.1.1 template.yaml
+wrtkit apply template.yaml 192.168.1.2
+```
+
+**Sample Output:**
+
+```
+Connecting to 192.168.1.1...
+✓ Configuration imported
+
+Configuration saved to router-backup.yaml
+  - Network devices: 2
+  - Network interfaces: 5
+  - Wireless radios: 2
+  - Wireless interfaces: 4
+  - DHCP sections: 2
+  - Firewall zones: 3
+  - Firewall forwardings: 2
+  - SQM queues: 0
+
+You can now use this file with 'wrtkit apply router-backup.yaml <target>'
+```
+
+!!! tip "Cloning Routers"
+    The `import` command is perfect for setting up multiple identical routers:
+
+    1. Configure one router manually or with wrtkit
+    2. Import its config: `wrtkit import 192.168.1.1 template.yaml`
+    3. Apply to other routers: `wrtkit apply template.yaml 192.168.1.2`
+
 ## Target Formats
 
 The `TARGET` argument supports multiple formats for specifying the device to connect to:

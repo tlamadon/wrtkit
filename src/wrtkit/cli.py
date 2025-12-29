@@ -11,6 +11,12 @@ from dotenv import load_dotenv
 from .config import UCIConfig, ConfigDiff
 from .ssh import SSHConnection
 from .serial_connection import SerialConnection
+from .network import NetworkDevice, NetworkInterface
+from .wireless import WirelessRadio, WirelessInterface
+from .dhcp import DHCPSection
+from .firewall import FirewallZone, FirewallForwarding
+from .sqm import SQMQueue
+from .progress import Spinner
 
 
 def _load_env_files() -> None:
@@ -112,6 +118,123 @@ def create_connection(
             key_filename=key_file,
             timeout=timeout,
         )
+
+
+def _parse_uci_export_to_dict(
+    package: str, config_str: str
+) -> dict[str, dict[str, Any]]:
+    """Parse UCI export format into a dict of sections.
+
+    Returns:
+        Dict mapping section_name -> {type: str, options: dict}
+    """
+    sections: dict[str, dict[str, Any]] = {}
+    current_section: Optional[str] = None
+    current_type: Optional[str] = None
+
+    for line in config_str.strip().split("\n"):
+        line = line.rstrip()
+        if not line or line.startswith("#") or line.startswith("package "):
+            continue
+
+        # Section definition: config <type> '<name>'
+        if line.startswith("config "):
+            parts = line.split("'")
+            if len(parts) >= 2:
+                current_section = parts[1]
+                current_type = line.split()[1].strip("'")
+                sections[current_section] = {"_type": current_type}
+
+        # Option: \toption <name> '<value>'
+        elif line.startswith("\toption ") and current_section:
+            parts = line.strip().split("'")
+            if len(parts) >= 2:
+                option_name = line.split()[1].strip("'")
+                option_value = parts[1]
+                # Try to convert to int/bool if applicable
+                if option_value.isdigit():
+                    sections[current_section][option_name] = int(option_value)
+                elif option_value.lower() in ("true", "false"):
+                    sections[current_section][option_name] = option_value.lower() == "true"
+                else:
+                    sections[current_section][option_name] = option_value
+
+        # List: \tlist <name> '<value>'
+        elif line.startswith("\tlist ") and current_section:
+            parts = line.strip().split("'")
+            if len(parts) >= 2:
+                list_name = line.split()[1].strip("'")
+                list_value = parts[1]
+                if list_name not in sections[current_section]:
+                    sections[current_section][list_name] = []
+                sections[current_section][list_name].append(list_value)
+
+    return sections
+
+
+def _import_remote_config(conn: Connection) -> UCIConfig:
+    """Import configuration from a remote device into a UCIConfig object."""
+    config = UCIConfig()
+    packages = ["network", "wireless", "dhcp", "firewall", "sqm"]
+
+    for package in packages:
+        try:
+            config_str = conn.get_uci_config(package)
+            sections = _parse_uci_export_to_dict(package, config_str)
+
+            if package == "network":
+                for name, opts in sections.items():
+                    section_type = opts.pop("_type", "")
+                    if section_type == "device":
+                        device = NetworkDevice(name, **opts)
+                        config.network.add_device(device)
+                    elif section_type == "interface":
+                        interface = NetworkInterface(name, **opts)
+                        config.network.add_interface(interface)
+
+            elif package == "wireless":
+                for name, opts in sections.items():
+                    section_type = opts.pop("_type", "")
+                    if section_type == "wifi-device":
+                        radio = WirelessRadio(name, **opts)
+                        config.wireless.add_radio(radio)
+                    elif section_type == "wifi-iface":
+                        iface = WirelessInterface(name, **opts)
+                        config.wireless.add_interface(iface)
+
+            elif package == "dhcp":
+                for name, opts in sections.items():
+                    section_type = opts.pop("_type", "")
+                    if section_type == "dhcp":
+                        dhcp = DHCPSection(name, **opts)
+                        config.dhcp.add_dhcp(dhcp)
+
+            elif package == "firewall":
+                zone_idx = 0
+                fwd_idx = 0
+                for name, opts in sections.items():
+                    section_type = opts.pop("_type", "")
+                    if section_type == "zone":
+                        zone = FirewallZone(zone_idx, **opts)
+                        config.firewall.add_zone(zone)
+                        zone_idx += 1
+                    elif section_type == "forwarding":
+                        fwd = FirewallForwarding(fwd_idx, **opts)
+                        config.firewall.add_forwarding(fwd)
+                        fwd_idx += 1
+
+            elif package == "sqm":
+                for name, opts in sections.items():
+                    section_type = opts.pop("_type", "")
+                    if section_type == "queue":
+                        queue = SQMQueue(name, **opts)
+                        config.sqm.add_queue(queue)
+
+        except Exception as e:
+            click.echo(f"Warning: Could not import {package}: {e}", err=True)
+            continue
+
+    return config
 
 
 def format_commands(diff: ConfigDiff, show_all: bool = False) -> str:
@@ -462,7 +585,7 @@ def commands(config_file: str) -> None:
         sys.exit(1)
 
 
-@cli.command()
+@cli.command("import")
 @click.argument("target", envvar="WRTKIT_TARGET")
 @click.argument("output_file", type=click.Path())
 @click.option("-p", "--password", envvar="WRTKIT_PASSWORD", help="SSH/login password")
@@ -475,34 +598,158 @@ def commands(config_file: str) -> None:
     "--format",
     "output_format",
     type=click.Choice(["yaml", "json"]),
-    default="yaml",
-    help="Output format (default: yaml)",
+    default=None,
+    help="Output format (auto-detected from file extension if not specified)",
 )
-def fetch(
+@click.option(
+    "--packages",
+    default="network,wireless,dhcp,firewall,sqm",
+    help="Comma-separated list of UCI packages to import (default: all)",
+)
+def import_config(
     target: str,
     output_file: str,
     password: Optional[str],
     key_file: Optional[str],
     timeout: int,
-    output_format: str,
+    output_format: Optional[str],
+    packages: str,
 ) -> None:
-    """Fetch current configuration from a device and save to file.
+    """Import configuration from a device and save as YAML/JSON.
 
-    TARGET is the device to fetch from (IP, hostname, or serial port).
-    OUTPUT_FILE is where to save the configuration.
+    Connects to a remote device, reads its UCI configuration, and saves
+    it in wrtkit's YAML/JSON format. The resulting file can be used with
+    'wrtkit apply' to configure other routers.
 
-    Note: This fetches raw UCI data and converts it to wrtkit format.
-    Some manual adjustments may be needed.
+    TARGET is the device to import from (IP, hostname, or serial port).
+    OUTPUT_FILE is where to save the configuration (.yaml or .json).
 
     Examples:
 
         \b
-        wrtkit fetch 192.168.1.1 current.yaml
-        wrtkit fetch router.local backup.json --format json
+        # Import full config from router
+        wrtkit import 192.168.1.1 router-backup.yaml
+
+        \b
+        # Import as JSON
+        wrtkit import router.local config.json
+
+        \b
+        # Import only network and wireless
+        wrtkit import 192.168.1.1 minimal.yaml --packages network,wireless
+
+        \b
+        # Use imported config on another router
+        wrtkit apply router-backup.yaml 192.168.1.2
     """
-    click.echo("Note: fetch command is not yet implemented.")
-    click.echo("Use 'wrtkit preview' to see current device configuration.")
-    sys.exit(1)
+    try:
+        # Determine output format
+        if output_format is None:
+            if output_file.endswith(".json"):
+                output_format = "json"
+            else:
+                output_format = "yaml"
+
+        click.echo(f"Connecting to {target}...")
+
+        # Connect and import config
+        conn = create_connection(target, password, key_file, timeout)
+
+        with conn:
+            spinner = Spinner("Importing configuration...")
+            spinner.start()
+
+            try:
+                config = UCIConfig()
+                package_list = [p.strip() for p in packages.split(",")]
+
+                for package in package_list:
+                    spinner.update(f"Importing {package}...")
+                    try:
+                        config_str = conn.get_uci_config(package)
+                        sections = _parse_uci_export_to_dict(package, config_str)
+
+                        if package == "network":
+                            for name, opts in sections.items():
+                                section_type = opts.pop("_type", "")
+                                if section_type == "device":
+                                    device = NetworkDevice(name, **opts)
+                                    config.network.add_device(device)
+                                elif section_type == "interface":
+                                    interface = NetworkInterface(name, **opts)
+                                    config.network.add_interface(interface)
+
+                        elif package == "wireless":
+                            for name, opts in sections.items():
+                                section_type = opts.pop("_type", "")
+                                if section_type == "wifi-device":
+                                    radio = WirelessRadio(name, **opts)
+                                    config.wireless.add_radio(radio)
+                                elif section_type == "wifi-iface":
+                                    iface = WirelessInterface(name, **opts)
+                                    config.wireless.add_interface(iface)
+
+                        elif package == "dhcp":
+                            for name, opts in sections.items():
+                                section_type = opts.pop("_type", "")
+                                if section_type == "dhcp":
+                                    dhcp = DHCPSection(name, **opts)
+                                    config.dhcp.add_dhcp(dhcp)
+
+                        elif package == "firewall":
+                            zone_idx = 0
+                            fwd_idx = 0
+                            for name, opts in sections.items():
+                                section_type = opts.pop("_type", "")
+                                if section_type == "zone":
+                                    zone = FirewallZone(zone_idx, **opts)
+                                    config.firewall.add_zone(zone)
+                                    zone_idx += 1
+                                elif section_type == "forwarding":
+                                    fwd = FirewallForwarding(fwd_idx, **opts)
+                                    config.firewall.add_forwarding(fwd)
+                                    fwd_idx += 1
+
+                        elif package == "sqm":
+                            for name, opts in sections.items():
+                                section_type = opts.pop("_type", "")
+                                if section_type == "queue":
+                                    queue = SQMQueue(name, **opts)
+                                    config.sqm.add_queue(queue)
+
+                    except Exception as e:
+                        spinner.update(f"Warning: {package} - {e}")
+                        continue
+
+                spinner.stop("Configuration imported")
+
+            except Exception as e:
+                spinner.stop(f"Failed: {e}")
+                raise
+
+        # Save to file
+        if output_format == "json":
+            config.to_json_file(output_file)
+        else:
+            config.to_yaml_file(output_file)
+
+        click.echo(f"\nConfiguration saved to {output_file}")
+        click.echo(f"  - Network devices: {len(config.network.devices)}")
+        click.echo(f"  - Network interfaces: {len(config.network.interfaces)}")
+        click.echo(f"  - Wireless radios: {len(config.wireless.radios)}")
+        click.echo(f"  - Wireless interfaces: {len(config.wireless.interfaces)}")
+        click.echo(f"  - DHCP sections: {len(config.dhcp.sections)}")
+        click.echo(f"  - Firewall zones: {len(config.firewall.zones)}")
+        click.echo(f"  - Firewall forwardings: {len(config.firewall.forwardings)}")
+        click.echo(f"  - SQM queues: {len(config.sqm.queues)}")
+        click.echo(f"\nYou can now use this file with 'wrtkit apply {output_file} <target>'")
+
+    except ConnectionError as e:
+        click.echo(f"Error: Failed to connect to {target}: {e}", err=True)
+        sys.exit(1)
+    except Exception as e:
+        click.echo(f"Error: {e}", err=True)
+        sys.exit(1)
 
 
 def main() -> None:

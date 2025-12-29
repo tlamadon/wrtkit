@@ -4,6 +4,7 @@ A Python library for managing OpenWRT configuration over SSH and serial console 
 
 ## Features
 
+- **Command Line Interface**: Manage devices directly from your terminal with `wrtkit preview` and `wrtkit apply`
 - **Composable Configuration**: Define OpenWRT configurations using type-safe Pydantic models with immutable builder patterns
 - **YAML/JSON Support**: Load and save configurations in YAML or JSON format
   - Generate JSON/YAML schemas for IDE autocomplete and validation
@@ -27,7 +28,70 @@ A Python library for managing OpenWRT configuration over SSH and serial console 
 pip install wrtkit
 ```
 
-## Quick Start
+## Command Line Interface
+
+WRTKit includes a CLI for managing devices directly from your terminal.
+
+### Quick CLI Examples
+
+```bash
+# Validate a configuration file
+wrtkit validate config.yaml
+
+# Preview changes (compare config with device)
+wrtkit preview config.yaml 192.168.1.1
+
+# Preview with UCI commands shown
+wrtkit preview config.yaml router.local --show-commands
+
+# Apply changes (dry-run first)
+wrtkit apply config.yaml 192.168.1.1 --dry-run
+
+# Apply changes for real
+wrtkit apply config.yaml 192.168.1.1 -p mypassword
+
+# Apply without confirmation prompt
+wrtkit apply config.yaml 192.168.1.1 -y
+
+# Show all UCI commands from a config
+wrtkit commands config.yaml
+```
+
+### Environment Variables
+
+Create a `.env` file for credentials (loaded automatically):
+
+```bash
+# .env
+WRTKIT_TARGET=192.168.1.1
+WRTKIT_PASSWORD=mysecretpassword
+WRTKIT_KEY_FILE=/path/to/ssh/key
+WRTKIT_TIMEOUT=60
+```
+
+You can also use environment variables in your YAML configs with OmegaConf interpolation:
+
+```yaml
+# config.yaml
+wireless:
+  interfaces:
+    wlan0:
+      ssid: MyNetwork
+      key: ${oc.env:WIFI_PASSWORD}
+```
+
+### CLI Commands
+
+| Command | Description |
+|---------|-------------|
+| `wrtkit preview` | Compare config with device, show diff |
+| `wrtkit apply` | Apply configuration to device |
+| `wrtkit validate` | Validate config file without connecting |
+| `wrtkit commands` | Output UCI commands as shell script |
+
+For full CLI documentation, see [docs/guide/cli.md](docs/guide/cli.md).
+
+## Quick Start (Python API)
 
 ```python
 from wrtkit import UCIConfig
