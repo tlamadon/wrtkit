@@ -17,8 +17,8 @@ from .dhcp import DHCPSection
 from .firewall import FirewallZone, FirewallForwarding
 from .sqm import SQMQueue
 from .progress import Spinner
-from .fleet import FleetConfig, load_fleet, filter_devices, merge_device_configs
-from .fleet_executor import FleetExecutor, DeviceResult, FleetResult
+from .fleet import load_fleet, filter_devices, merge_device_configs
+from .fleet_executor import FleetExecutor, DeviceResult
 
 
 def _load_env_files() -> None:
@@ -928,7 +928,7 @@ def fleet_apply(
                         if device_result.diff.is_empty():
                             click.echo("  No changes needed")
                         else:
-                            click.echo(device_result.diff.to_tree(color=use_color, indent=2))
+                            click.echo(device_result.diff.to_tree(color=use_color))
                     elif not device_result.success:
                         click.echo(f"  Error: {device_result.error}")
 
@@ -971,9 +971,9 @@ def fleet_apply(
                 else:
                     click.echo(f"Fleet apply partial: {commit_result.success_count}/{commit_result.total_count} devices updated")
 
-                for name, result in commit_result.devices.items():
-                    if not result.success:
-                        click.echo(f"  - {name}: {result.error}", err=True)
+                for name, dev_result in commit_result.devices.items():
+                    if not dev_result.success:
+                        click.echo(f"  - {name}: {dev_result.error}", err=True)
                 sys.exit(1)
 
         finally:
@@ -1039,7 +1039,7 @@ def fleet_preview(
                     if device_result.diff.is_empty():
                         click.echo("  No changes needed\n")
                     else:
-                        click.echo(device_result.diff.to_tree(color=use_color, indent=2))
+                        click.echo(device_result.diff.to_tree(color=use_color))
                         total_changes += device_result.changes_count
                         click.echo()
                 elif not device_result.success:
@@ -1080,7 +1080,7 @@ def fleet_validate(fleet_file: str) -> None:
         fleet_config = load_fleet(fleet_file)
 
         click.echo(f"Fleet file: {fleet_file}")
-        click.echo(f"  Defaults:")
+        click.echo("  Defaults:")
         click.echo(f"    timeout: {fleet_config.defaults.timeout}s")
         click.echo(f"    username: {fleet_config.defaults.username}")
         click.echo(f"    commit_delay: {fleet_config.defaults.commit_delay}s")

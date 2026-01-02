@@ -1,13 +1,11 @@
 """Fleet execution engine with two-phase coordinated updates."""
 
-import sys
-import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Callable, Dict, List, Optional, Union
 
-from .config import ConfigDiff, UCIConfig
+from .config import ConfigDiff
 from .fleet import (
     FleetConfig,
     FleetDevice,
@@ -208,7 +206,7 @@ class FleetExecutor:
 
                 with conn:
                     # Compute diff
-                    diff = config.diff(conn, show_remote_only=True, verbose=False)
+                    diff = config.diff(conn, show_remote_only=True, verbose=False)  # type: ignore[arg-type]
 
                     changes = len(diff.to_add) + len(diff.to_modify) + len(diff.to_remove)
                     return DeviceResult(
@@ -301,7 +299,7 @@ class FleetExecutor:
 
                 # Apply diff without commit/reload
                 diff = config.apply_diff(
-                    conn,
+                    conn,  # type: ignore[arg-type]
                     remove_unmanaged=remove_unmanaged,
                     dry_run=False,
                     auto_commit=False,

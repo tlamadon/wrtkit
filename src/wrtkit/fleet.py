@@ -2,7 +2,7 @@
 
 import fnmatch
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Set
+from typing import Any, Dict, List, Optional, Set, cast
 
 from omegaconf import OmegaConf
 from pydantic import BaseModel, Field
@@ -125,7 +125,7 @@ def merge_device_configs(
     if not isinstance(data, dict):
         raise ValueError("Merged config must be a dictionary")
 
-    return UCIConfig.from_dict(data)
+    return UCIConfig.from_dict(cast(Dict[str, Any], data))
 
 
 def filter_devices(
