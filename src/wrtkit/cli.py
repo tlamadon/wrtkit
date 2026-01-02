@@ -1178,6 +1178,293 @@ def fleet_show(
         sys.exit(1)
 
 
+# =============================================================================
+# Testing Commands
+# =============================================================================
+
+
+@cli.group()
+def testing() -> None:
+    """Run network tests on OpenWRT devices.
+
+    Testing mode enables running network diagnostics (ping, iperf) between
+    devices defined in a fleet inventory.
+
+    \b
+    Example test-config.yaml:
+        fleet_file: fleet.yaml
+
+        tests:
+          - name: ping-router-to-ap
+            type: ping
+            source: main-router
+            destination: ap-living
+            count: 10
+
+          - name: iperf-router-to-ap
+            type: iperf
+            server: ap-living
+            client: main-router
+            duration: 10
+    """
+    pass
+
+
+@testing.command("run")
+@click.argument("test_file", type=click.Path(exists=True))
+@click.option("--test", "-t", "test_name", help="Run only the specified test by name")
+@click.option("--no-color", is_flag=True, help="Disable colored output")
+@click.option("--json", "output_json", is_flag=True, help="Output results as JSON")
+def testing_run(
+    test_file: str,
+    test_name: Optional[str],
+    no_color: bool,
+    output_json: bool,
+) -> None:
+    """Run network tests from a test configuration file.
+
+    TEST_FILE is the path to a YAML test configuration file.
+
+    Examples:
+
+        \b
+        # Run all tests
+        wrtkit testing run tests.yaml
+
+        \b
+        # Run a specific test
+        wrtkit testing run tests.yaml --test ping-router-to-ap
+
+        \b
+        # Output as JSON
+        wrtkit testing run tests.yaml --json
+    """
+    from .testing import load_test_config, resolve_tests, ResolvedPingTest, ResolvedIperfTest
+    from .test_executor import (
+        TestExecutor,
+        format_result,
+        PingResult,
+        IperfResult,
+    )
+    import json as json_module
+
+    try:
+        test_path = Path(test_file)
+        test_config = load_test_config(test_file)
+
+        # Resolve tests with fleet device information
+        resolved_tests = resolve_tests(test_config, test_path)
+
+        # Filter to specific test if requested
+        if test_name:
+            resolved_tests = [t for t in resolved_tests if t.name == test_name]
+            if not resolved_tests:
+                click.echo(f"Error: Test '{test_name}' not found in config", err=True)
+                sys.exit(1)
+
+        if not resolved_tests:
+            click.echo("No tests defined in configuration.", err=True)
+            sys.exit(1)
+
+        use_color = not no_color and sys.stdout.isatty() and not output_json
+
+        if not output_json:
+            click.echo(f"Running {len(resolved_tests)} test(s)...\n")
+
+        # Set up callbacks for progress
+        def on_test_start(name: str) -> None:
+            if not output_json:
+                click.echo(f"Running: {name}")
+
+        def on_status(message: str) -> None:
+            if not output_json:
+                click.echo(f"  {message}")
+
+        # Create executor and run tests
+        executor = TestExecutor(
+            on_test_start=on_test_start,
+            on_status=on_status,
+        )
+
+        results = executor.run_tests(resolved_tests)
+
+        # Output results
+        if output_json:
+            json_results = []
+            for r in results:
+                if isinstance(r, PingResult):
+                    json_results.append({
+                        "name": r.name,
+                        "type": "ping",
+                        "source": r.source,
+                        "destination": r.destination,
+                        "packets_sent": r.packets_sent,
+                        "packets_received": r.packets_received,
+                        "packet_loss_pct": r.packet_loss_pct,
+                        "rtt_min": r.rtt_min,
+                        "rtt_avg": r.rtt_avg,
+                        "rtt_max": r.rtt_max,
+                        "success": r.success,
+                        "error": r.error,
+                    })
+                elif isinstance(r, IperfResult):
+                    json_results.append({
+                        "name": r.name,
+                        "type": "iperf",
+                        "server": r.server,
+                        "client": r.client,
+                        "protocol": r.protocol,
+                        "duration": r.duration,
+                        "sent_bytes": r.sent_bytes,
+                        "sent_bps": r.sent_bps,
+                        "received_bytes": r.received_bytes,
+                        "received_bps": r.received_bps,
+                        "retransmits": r.retransmits,
+                        "jitter_ms": r.jitter_ms,
+                        "lost_packets": r.lost_packets,
+                        "lost_percent": r.lost_percent,
+                        "success": r.success,
+                        "error": r.error,
+                    })
+            click.echo(json_module.dumps(json_results, indent=2))
+        else:
+            click.echo("\n" + "=" * 60)
+            click.echo("Results")
+            click.echo("=" * 60 + "\n")
+
+            for result in results:
+                click.echo(format_result(result, use_color))
+                click.echo()
+
+            # Summary
+            passed = sum(1 for r in results if r.success)
+            failed = len(results) - passed
+
+            if use_color:
+                if failed == 0:
+                    click.echo(f"\033[32mAll {passed} test(s) passed\033[0m")
+                else:
+                    click.echo(f"\033[31m{failed} test(s) failed\033[0m, {passed} passed")
+            else:
+                if failed == 0:
+                    click.echo(f"All {passed} test(s) passed")
+                else:
+                    click.echo(f"{failed} test(s) failed, {passed} passed")
+
+        # Exit with error code if any tests failed
+        if any(not r.success for r in results):
+            sys.exit(1)
+
+    except FileNotFoundError as e:
+        click.echo(f"Error: {e}", err=True)
+        sys.exit(1)
+    except ValueError as e:
+        click.echo(f"Error: {e}", err=True)
+        sys.exit(1)
+    except Exception as e:
+        click.echo(f"Error: {e}", err=True)
+        sys.exit(1)
+
+
+@testing.command("validate")
+@click.argument("test_file", type=click.Path(exists=True))
+def testing_validate(test_file: str) -> None:
+    """Validate a test configuration file.
+
+    Checks that:
+    - The test file is valid YAML
+    - All referenced devices exist in the fleet file
+    - Test definitions have required fields
+
+    Examples:
+
+        \b
+        wrtkit testing validate tests.yaml
+    """
+    from .testing import load_test_config, resolve_tests, ResolvedPingTest
+
+    try:
+        test_path = Path(test_file)
+        test_config = load_test_config(test_file)
+
+        click.echo(f"Test config: {test_file}")
+        click.echo(f"Fleet file: {test_config.fleet_file}")
+        click.echo(f"Tests defined: {len(test_config.tests)}")
+        click.echo()
+
+        # Try to resolve all tests (validates device references)
+        resolved = resolve_tests(test_config, test_path)
+
+        click.echo("Tests:")
+        for test in resolved:
+            if isinstance(test, ResolvedPingTest):
+                # Ping test
+                click.echo(f"  - {test.name} (ping): {test.source_device} → {test.destination}")
+            else:
+                # Iperf test
+                click.echo(f"  - {test.name} (iperf): {test.client_device} → {test.server_device}")
+
+        click.echo()
+        click.echo("✓ Configuration is valid")
+
+    except FileNotFoundError as e:
+        click.echo(f"Error: {e}", err=True)
+        sys.exit(1)
+    except ValueError as e:
+        click.echo(f"Validation error: {e}", err=True)
+        sys.exit(1)
+    except Exception as e:
+        click.echo(f"Error: {e}", err=True)
+        sys.exit(1)
+
+
+@testing.command("show")
+@click.argument("test_file", type=click.Path(exists=True))
+@click.option("--format", "-f", "output_format", type=click.Choice(["yaml", "json"]), default="yaml")
+def testing_show(test_file: str, output_format: str) -> None:
+    """Show resolved test configuration.
+
+    Displays the test configuration with all device references resolved
+    to their actual targets/IPs.
+
+    Examples:
+
+        \b
+        wrtkit testing show tests.yaml
+        wrtkit testing show tests.yaml --format json
+    """
+    from .testing import load_test_config, resolve_tests
+    import json as json_module
+    import yaml
+
+    try:
+        test_path = Path(test_file)
+        test_config = load_test_config(test_file)
+        resolved = resolve_tests(test_config, test_path)
+
+        # Convert to serializable format
+        tests_data = []
+        for test in resolved:
+            tests_data.append(test.model_dump())
+
+        output_data = {
+            "fleet_file": test_config.fleet_file,
+            "tests": tests_data,
+        }
+
+        if output_format == "json":
+            click.echo(json_module.dumps(output_data, indent=2))
+        else:
+            click.echo(yaml.dump(output_data, default_flow_style=False, sort_keys=False))
+
+    except FileNotFoundError as e:
+        click.echo(f"Error: {e}", err=True)
+        sys.exit(1)
+    except Exception as e:
+        click.echo(f"Error: {e}", err=True)
+        sys.exit(1)
+
+
 def main() -> None:
     """Main entry point for the CLI."""
     cli()

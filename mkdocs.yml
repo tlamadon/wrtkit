@@ -83,6 +83,7 @@ nav:
   - User Guide:
     - Command Line Interface: guide/cli.md
     - Fleet Mode: guide/fleet.md
+    - Testing Mode: guide/testing.md
     - Network Configuration: guide/network.md
     - Wireless Configuration: guide/wireless.md
     - DHCP Configuration: guide/dhcp.md

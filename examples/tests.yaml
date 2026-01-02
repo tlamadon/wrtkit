@@ -1,0 +1,112 @@
+# Example Test Configuration File
+# ================================
+#
+# This file defines network tests to run between devices in a fleet.
+# Use with: wrtkit testing run tests.yaml
+#
+# Tests reference devices defined in the fleet inventory file.
+# Device names are resolved to their target IP/hostname from the fleet.
+
+fleet_file: fleet.yaml  # Path to fleet inventory (relative to this file)
+
+tests:
+  # ==========================================================================
+  # Ping Tests
+  # ==========================================================================
+  # Ping tests run from a source device to a destination.
+  # Destination can be a fleet device name or an IP/hostname.
+
+  # Ping from main router to an access point
+  - name: ping-router-to-ap-living
+    type: ping
+    source: main-router           # Device name from fleet
+    destination: ap-living-room   # Device name from fleet (resolves to 192.168.1.10)
+    count: 10                     # Number of pings
+    timeout: 5                    # Per-ping timeout in seconds
+
+  # Ping from main router to office AP
+  - name: ping-router-to-ap-office
+    type: ping
+    source: main-router
+    destination: ap-office
+    count: 5
+
+  # Ping to an external host (internet connectivity test)
+  - name: ping-internet
+    type: ping
+    source: main-router
+    destination: 8.8.8.8          # Can also be raw IP or hostname
+    count: 4
+    timeout: 2
+
+  # Ping between access points (mesh connectivity test)
+  - name: ping-ap-to-ap
+    type: ping
+    source: ap-living-room
+    destination: ap-office
+    count: 10
+    interval: 0.5                 # Seconds between pings (optional)
+
+  # ==========================================================================
+  # Iperf Tests
+  # ==========================================================================
+  # Iperf tests measure bandwidth between two devices.
+  # The server device runs iperf3 in server mode, client connects to it.
+  # Note: iperf3 must be installed on both devices.
+
+  # TCP throughput test: router to AP
+  - name: iperf-router-to-ap-tcp
+    type: iperf
+    server: ap-living-room        # Device to run iperf server on
+    client: main-router           # Device to run iperf client on
+    duration: 10                  # Test duration in seconds
+    parallel: 4                   # Number of parallel streams
+    protocol: tcp                 # tcp or udp
+
+  # Reverse direction test (AP sends to router)
+  - name: iperf-ap-to-router-tcp
+    type: iperf
+    server: main-router
+    client: ap-living-room
+    duration: 10
+    parallel: 4
+    protocol: tcp
+    reverse: false                # Set to true to reverse data direction
+
+  # UDP throughput test with bitrate limit
+  - name: iperf-udp-test
+    type: iperf
+    server: ap-office
+    client: main-router
+    duration: 5
+    protocol: udp
+    bitrate: 100M                 # Target bitrate for UDP (e.g., '100M', '1G')
+    port: 5201                    # Iperf server port (default: 5201)
+
+  # AP to AP bandwidth test (mesh performance)
+  - name: iperf-ap-mesh
+    type: iperf
+    server: ap-office
+    client: ap-living-room
+    duration: 15
+    parallel: 2
+    protocol: tcp
+
+# Usage Examples:
+# ---------------
+#
+# Run all tests:
+#   wrtkit testing run tests.yaml
+#
+# Run a specific test:
+#   wrtkit testing run tests.yaml --test ping-router-to-ap-living
+#
+# Output results as JSON:
+#   wrtkit testing run tests.yaml --json
+#
+# Validate test configuration:
+#   wrtkit testing validate tests.yaml
+#
+# Show resolved test configuration:
+#   wrtkit testing show tests.yaml
+#   wrtkit testing show tests.yaml --format json

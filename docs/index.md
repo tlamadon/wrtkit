@@ -5,6 +5,8 @@ A Python library for managing OpenWRT configuration over SSH and serial console 
 ## Features
 
 - **Command Line Interface**: Manage devices directly from your terminal with `wrtkit preview` and `wrtkit apply`
+- **Fleet Mode**: Manage multiple devices with coordinated atomic updates and two-phase execution
+- **Testing Mode**: Run network diagnostics (ping, iperf) between devices defined in your fleet
 - **Composable Configuration**: Define OpenWRT configurations using type-safe Pydantic models with immutable builder patterns
 - **YAML/JSON Support**: Load and save configurations in YAML or JSON format
   - Generate JSON/YAML schemas for IDE autocomplete and validation
@@ -69,6 +71,8 @@ wrtkit import 192.168.1.1 router-backup.yaml
 | `wrtkit validate` | Validate config file without connecting |
 | `wrtkit commands` | Output UCI commands as shell script |
 | `wrtkit import` | Import config from device and save as YAML/JSON |
+| `wrtkit fleet` | Manage multiple devices with coordinated updates |
+| `wrtkit testing` | Run network tests (ping, iperf) between devices |
 
 For full CLI documentation, see [Command Line Interface](guide/cli.md).
 
@@ -165,6 +169,8 @@ The CLI supports multiple formats for specifying the device to connect to:
 ## Next Steps
 
 - [Command Line Interface](guide/cli.md) - Full CLI documentation
+- [Fleet Mode](guide/fleet.md) - Manage multiple devices
+- [Testing Mode](guide/testing.md) - Network diagnostics (ping, iperf)
 - [YAML/JSON Configuration](yaml-json-guide.md) - Configuration file format
 - [Quick Start Tutorial](getting-started/quick-start.md) - Get started quickly
 - [API Reference](api/config.md) - Python API documentation

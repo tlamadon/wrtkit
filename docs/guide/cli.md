@@ -475,3 +475,23 @@ wrtkit fleet apply fleet.yaml --tags production
 ```
 
 Fleet mode ensures all devices commit their changes simultaneously, which is essential for network changes that might break connectivity.
+
+### 7. Use Testing Mode for Network Diagnostics
+
+For running network tests (ping, iperf) between devices, use [Testing Mode](testing.md):
+
+```bash
+# Run all tests defined in config
+wrtkit testing run tests.yaml
+
+# Run a specific test
+wrtkit testing run tests.yaml --test ping-router-to-ap
+
+# Validate test configuration
+wrtkit testing validate tests.yaml
+
+# Output results as JSON for scripting
+wrtkit testing run tests.yaml --json
+```
+
+Testing mode integrates with your fleet inventory, allowing you to reference devices by name instead of IP addresses.
