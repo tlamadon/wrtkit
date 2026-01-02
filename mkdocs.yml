@@ -82,6 +82,7 @@ nav:
     - Your First Config: getting-started/first-config.md
   - User Guide:
     - Command Line Interface: guide/cli.md
+    - Fleet Mode: guide/fleet.md
     - Network Configuration: guide/network.md
     - Wireless Configuration: guide/wireless.md
     - DHCP Configuration: guide/dhcp.md
@@ -105,6 +106,7 @@ nav:
     - DHCP: api/dhcp.md
     - Firewall: api/firewall.md
     - SSH: api/ssh.md
+    - Fleet: api/fleet.md
     - Base Classes: api/base.md
   - Development:
     - Contributing: development/contributing.md

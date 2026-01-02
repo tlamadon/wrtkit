@@ -17,6 +17,8 @@ from .dhcp import DHCPSection
 from .firewall import FirewallZone, FirewallForwarding
 from .sqm import SQMQueue
 from .progress import Spinner
+from .fleet import FleetConfig, load_fleet, filter_devices, merge_device_configs
+from .fleet_executor import FleetExecutor, DeviceResult, FleetResult
 
 
 def _load_env_files() -> None:
@@ -754,6 +756,422 @@ def import_config(
 
     except ConnectionError as e:
         click.echo(f"Error: Failed to connect to {target}: {e}", err=True)
+        sys.exit(1)
+    except Exception as e:
+        click.echo(f"Error: {e}", err=True)
+        sys.exit(1)
+
+
+# =============================================================================
+# Fleet Commands
+# =============================================================================
+
+
+@cli.group()
+def fleet() -> None:
+    """Manage multiple OpenWRT devices from an inventory file.
+
+    Fleet mode enables coordinated configuration updates across multiple devices
+    with two-phase execution for safe network changes.
+
+    \b
+    Example fleet.yaml:
+        defaults:
+          timeout: 30
+          username: root
+          commit_delay: 10
+
+        config_layers:
+          base: configs/base.yaml
+
+        devices:
+          router:
+            target: 192.168.1.1
+            password: ${oc.env:ROUTER_PASSWORD}
+            configs:
+              - ${config_layers.base}
+              - configs/router.yaml
+            tags: [core, production]
+    """
+    pass
+
+
+def _parse_tags(tags_str: Optional[str]) -> Optional[list[str]]:
+    """Parse comma-separated tags string into list."""
+    if tags_str is None:
+        return None
+    return [t.strip() for t in tags_str.split(",") if t.strip()]
+
+
+def _print_fleet_header(fleet_file: str, devices: dict, target: Optional[str], tags: Optional[str]) -> None:
+    """Print fleet operation header."""
+    click.echo(f"\nFleet: {fleet_file}")
+    filter_parts = []
+    if target:
+        filter_parts.append(f"target: {target}")
+    if tags:
+        filter_parts.append(f"tags: {tags}")
+    if filter_parts:
+        click.echo(f"Targets: {len(devices)} device(s) (filtered by {', '.join(filter_parts)})")
+    else:
+        click.echo(f"Targets: {len(devices)} device(s)")
+    click.echo()
+
+
+@fleet.command("apply")
+@click.argument("fleet_file", type=click.Path(exists=True))
+@click.option("--target", "-t", help="Device name or glob pattern (e.g., 'ap-*')")
+@click.option("--tags", help="Comma-separated tags to filter by (AND logic)")
+@click.option("--commit-delay", type=int, help="Seconds to wait before coordinated commit")
+@click.option("--remove-unmanaged", is_flag=True, help="Remove settings not in config")
+@click.option("--dry-run", is_flag=True, help="Show what would be done without making changes")
+@click.option("-y", "--yes", is_flag=True, help="Skip confirmation prompt")
+@click.option("--no-color", is_flag=True, help="Disable colored output")
+def fleet_apply(
+    fleet_file: str,
+    target: Optional[str],
+    tags: Optional[str],
+    commit_delay: Optional[int],
+    remove_unmanaged: bool,
+    dry_run: bool,
+    yes: bool,
+    no_color: bool,
+) -> None:
+    """Apply configuration to fleet devices with coordinated updates.
+
+    Uses two-phase execution for safe network changes:
+
+    \b
+    Phase 1 (Stage): Push UCI commands to all devices in parallel.
+                     Fails fast if any device fails, rolling back all changes.
+    Phase 2 (Commit): Send coordinated commit commands to all devices.
+                     All devices restart services at roughly the same time.
+
+    Examples:
+
+        \b
+        # Apply to all devices
+        wrtkit fleet apply fleet.yaml
+
+        \b
+        # Apply to specific device
+        wrtkit fleet apply fleet.yaml --target main-router
+
+        \b
+        # Apply to devices matching glob
+        wrtkit fleet apply fleet.yaml --target "ap-*"
+
+        \b
+        # Apply to devices with specific tags
+        wrtkit fleet apply fleet.yaml --tags production
+
+        \b
+        # Dry run
+        wrtkit fleet apply fleet.yaml --dry-run
+    """
+    try:
+        fleet_path = Path(fleet_file)
+        fleet_config = load_fleet(fleet_file)
+
+        # Filter devices
+        tags_list = _parse_tags(tags)
+        devices = filter_devices(fleet_config, target, tags_list)
+
+        if not devices:
+            click.echo("No devices matched the specified filters.", err=True)
+            sys.exit(1)
+
+        _print_fleet_header(fleet_file, devices, target, tags)
+
+        # Create executor with progress callbacks
+        use_color = not no_color and sys.stdout.isatty()
+
+        def on_device_start(name: str, device_target: str) -> None:
+            click.echo(f"  {name} ({device_target})...", nl=False)
+
+        def on_device_complete(name: str, result: DeviceResult) -> None:
+            if result.success:
+                if use_color:
+                    click.echo(f" \033[32m✓\033[0m {result.changes_count} changes")
+                else:
+                    click.echo(f" OK - {result.changes_count} changes")
+            else:
+                if use_color:
+                    click.echo(f" \033[31m✗\033[0m {result.error}")
+                else:
+                    click.echo(f" FAILED - {result.error}")
+
+        def on_phase_start(phase: str) -> None:
+            if phase == "stage":
+                click.echo("[Phase 1: Staging Changes]")
+            elif phase == "commit":
+                delay = commit_delay or fleet_config.defaults.commit_delay
+                click.echo(f"\n[Phase 2: Coordinated Commit (delay: {delay}s)]")
+
+        executor = FleetExecutor(
+            fleet=fleet_config,
+            fleet_path=fleet_path,
+            on_device_start=on_device_start,
+            on_device_complete=on_device_complete,
+            on_phase_start=on_phase_start,
+        )
+
+        try:
+            if dry_run:
+                # Just preview changes
+                click.echo("[Dry Run - Preview Mode]")
+                result = executor.preview(target=target, tags=tags_list)
+
+                for name, device_result in result.devices.items():
+                    click.echo(f"\n{name} ({device_result.target}):")
+                    if device_result.success and device_result.diff:
+                        if device_result.diff.is_empty():
+                            click.echo("  No changes needed")
+                        else:
+                            click.echo(device_result.diff.to_tree(color=use_color, indent=2))
+                    elif not device_result.success:
+                        click.echo(f"  Error: {device_result.error}")
+
+                click.echo("\n[Dry run mode - no changes made]")
+                return
+
+            # Confirmation prompt
+            if not yes:
+                click.echo(f"This will apply changes to {len(devices)} device(s).")
+                if not click.confirm("Continue?"):
+                    click.echo("Aborted.")
+                    return
+
+            # Execute two-phase apply
+            stage_result, commit_result = executor.apply(
+                target=target,
+                tags=tags_list,
+                remove_unmanaged=remove_unmanaged,
+                commit_delay=commit_delay,
+            )
+
+            # Report results
+            click.echo()
+            if stage_result.aborted:
+                if use_color:
+                    click.echo(f"\033[31mFleet apply ABORTED:\033[0m {stage_result.abort_reason}")
+                else:
+                    click.echo(f"Fleet apply ABORTED: {stage_result.abort_reason}")
+                click.echo("All staged changes have been rolled back.")
+                sys.exit(1)
+
+            if commit_result.all_successful:
+                if use_color:
+                    click.echo(f"\033[32mFleet apply completed:\033[0m {commit_result.success_count}/{commit_result.total_count} devices updated")
+                else:
+                    click.echo(f"Fleet apply completed: {commit_result.success_count}/{commit_result.total_count} devices updated")
+            else:
+                if use_color:
+                    click.echo(f"\033[33mFleet apply partial:\033[0m {commit_result.success_count}/{commit_result.total_count} devices updated")
+                else:
+                    click.echo(f"Fleet apply partial: {commit_result.success_count}/{commit_result.total_count} devices updated")
+
+                for name, result in commit_result.devices.items():
+                    if not result.success:
+                        click.echo(f"  - {name}: {result.error}", err=True)
+                sys.exit(1)
+
+        finally:
+            executor.cleanup()
+
+    except FileNotFoundError as e:
+        click.echo(f"Error: {e}", err=True)
+        sys.exit(1)
+    except Exception as e:
+        click.echo(f"Error: {e}", err=True)
+        sys.exit(1)
+
+
+@fleet.command("preview")
+@click.argument("fleet_file", type=click.Path(exists=True))
+@click.option("--target", "-t", help="Device name or glob pattern (e.g., 'ap-*')")
+@click.option("--tags", help="Comma-separated tags to filter by (AND logic)")
+@click.option("--no-color", is_flag=True, help="Disable colored output")
+def fleet_preview(
+    fleet_file: str,
+    target: Optional[str],
+    tags: Optional[str],
+    no_color: bool,
+) -> None:
+    """Preview configuration changes for fleet devices.
+
+    Connects to each device and shows the diff between current and desired config.
+
+    Examples:
+
+        \b
+        # Preview all devices
+        wrtkit fleet preview fleet.yaml
+
+        \b
+        # Preview specific device
+        wrtkit fleet preview fleet.yaml --target main-router
+    """
+    try:
+        fleet_path = Path(fleet_file)
+        fleet_config = load_fleet(fleet_file)
+
+        tags_list = _parse_tags(tags)
+        devices = filter_devices(fleet_config, target, tags_list)
+
+        if not devices:
+            click.echo("No devices matched the specified filters.", err=True)
+            sys.exit(1)
+
+        _print_fleet_header(fleet_file, devices, target, tags)
+
+        use_color = not no_color and sys.stdout.isatty()
+
+        executor = FleetExecutor(fleet=fleet_config, fleet_path=fleet_path)
+
+        try:
+            result = executor.preview(target=target, tags=tags_list)
+
+            total_changes = 0
+            for name, device_result in result.devices.items():
+                click.echo(f"{name} ({device_result.target}):")
+                if device_result.success and device_result.diff:
+                    if device_result.diff.is_empty():
+                        click.echo("  No changes needed\n")
+                    else:
+                        click.echo(device_result.diff.to_tree(color=use_color, indent=2))
+                        total_changes += device_result.changes_count
+                        click.echo()
+                elif not device_result.success:
+                    if use_color:
+                        click.echo(f"  \033[31mError:\033[0m {device_result.error}\n")
+                    else:
+                        click.echo(f"  Error: {device_result.error}\n")
+
+            click.echo(f"Total: {result.success_count}/{result.total_count} devices scanned, {total_changes} changes pending")
+
+        finally:
+            executor.cleanup()
+
+    except FileNotFoundError as e:
+        click.echo(f"Error: {e}", err=True)
+        sys.exit(1)
+    except Exception as e:
+        click.echo(f"Error: {e}", err=True)
+        sys.exit(1)
+
+
+@fleet.command("validate")
+@click.argument("fleet_file", type=click.Path(exists=True))
+def fleet_validate(fleet_file: str) -> None:
+    """Validate fleet file and all referenced configurations.
+
+    Checks:
+    - Fleet file syntax and schema
+    - All referenced config files exist
+    - Config files are valid YAML/JSON
+
+    Example:
+
+        wrtkit fleet validate fleet.yaml
+    """
+    try:
+        fleet_path = Path(fleet_file)
+        fleet_config = load_fleet(fleet_file)
+
+        click.echo(f"Fleet file: {fleet_file}")
+        click.echo(f"  Defaults:")
+        click.echo(f"    timeout: {fleet_config.defaults.timeout}s")
+        click.echo(f"    username: {fleet_config.defaults.username}")
+        click.echo(f"    commit_delay: {fleet_config.defaults.commit_delay}s")
+
+        if fleet_config.config_layers:
+            click.echo(f"  Config layers: {len(fleet_config.config_layers)}")
+            for name, path in fleet_config.config_layers.items():
+                full_path = fleet_path.parent / path if not Path(path).is_absolute() else Path(path)
+                exists = "✓" if full_path.exists() else "✗ NOT FOUND"
+                click.echo(f"    - {name}: {path} [{exists}]")
+
+        click.echo(f"  Devices: {len(fleet_config.devices)}")
+
+        errors = []
+        for name, device in fleet_config.devices.items():
+            click.echo(f"\n  {name}:")
+            click.echo(f"    target: {device.target}")
+            click.echo(f"    tags: {device.tags}")
+            click.echo(f"    configs ({len(device.configs)}):")
+
+            for config_path in device.configs:
+                full_path = fleet_path.parent / config_path if not Path(config_path).is_absolute() else Path(config_path)
+                if full_path.exists():
+                    try:
+                        # Try to load and validate
+                        merge_device_configs(device, fleet_path)
+                        click.echo(f"      - {config_path} [✓]")
+                    except Exception as e:
+                        click.echo(f"      - {config_path} [✗ {e}]")
+                        errors.append(f"{name}: {config_path} - {e}")
+                else:
+                    click.echo(f"      - {config_path} [✗ NOT FOUND]")
+                    errors.append(f"{name}: {config_path} - file not found")
+
+        click.echo()
+        if errors:
+            click.echo(f"Validation FAILED with {len(errors)} error(s):", err=True)
+            for error in errors:
+                click.echo(f"  - {error}", err=True)
+            sys.exit(1)
+        else:
+            click.echo("Validation passed!")
+
+    except FileNotFoundError as e:
+        click.echo(f"Error: {e}", err=True)
+        sys.exit(1)
+    except Exception as e:
+        click.echo(f"Error: {e}", err=True)
+        sys.exit(1)
+
+
+@fleet.command("show")
+@click.argument("fleet_file", type=click.Path(exists=True))
+@click.option("--target", "-t", required=True, help="Device name to show merged config for")
+@click.option("--format", "output_format", type=click.Choice(["yaml", "json"]), default="yaml", help="Output format")
+def fleet_show(
+    fleet_file: str,
+    target: str,
+    output_format: str,
+) -> None:
+    """Show merged configuration for a specific device.
+
+    Displays the final configuration after merging all config layers.
+
+    Example:
+
+        wrtkit fleet show fleet.yaml --target main-router
+    """
+    try:
+        fleet_path = Path(fleet_file)
+        fleet_config = load_fleet(fleet_file)
+
+        if target not in fleet_config.devices:
+            click.echo(f"Error: Device '{target}' not found in fleet", err=True)
+            sys.exit(1)
+
+        device = fleet_config.devices[target]
+        config = merge_device_configs(device, fleet_path)
+
+        click.echo(f"# Merged configuration for: {target}")
+        click.echo(f"# Target: {device.target}")
+        click.echo(f"# Config layers: {device.configs}")
+        click.echo()
+
+        if output_format == "json":
+            click.echo(config.to_json())
+        else:
+            click.echo(config.to_yaml())
+
+    except FileNotFoundError as e:
+        click.echo(f"Error: {e}", err=True)
         sys.exit(1)
     except Exception as e:
         click.echo(f"Error: {e}", err=True)

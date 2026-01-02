@@ -88,8 +88,74 @@ wireless:
 | `wrtkit apply` | Apply configuration to device |
 | `wrtkit validate` | Validate config file without connecting |
 | `wrtkit commands` | Output UCI commands as shell script |
+| `wrtkit fleet apply` | Apply config to multiple devices with coordinated updates |
+| `wrtkit fleet preview` | Preview changes for multiple devices |
+| `wrtkit fleet validate` | Validate fleet inventory file |
+| `wrtkit fleet show` | Show merged config for a specific device |
 
 For full CLI documentation, see [docs/guide/cli.md](docs/guide/cli.md).
+
+### Fleet Mode (Multi-Device Management)
+
+Fleet mode enables managing multiple OpenWRT devices from a single inventory file with **coordinated atomic updates** - perfect for updating network configurations that might break connectivity.
+
+```bash
+# Apply to all devices with coordinated commit
+wrtkit fleet apply fleet.yaml
+
+# Target specific devices
+wrtkit fleet apply fleet.yaml --target main-router
+wrtkit fleet apply fleet.yaml --target "ap-*"     # glob pattern
+wrtkit fleet apply fleet.yaml --tags production   # by tag
+
+# Preview changes without applying
+wrtkit fleet preview fleet.yaml
+
+# Validate fleet file
+wrtkit fleet validate fleet.yaml
+```
+
+#### Fleet Inventory File
+
+```yaml
+# fleet.yaml
+defaults:
+  timeout: 30
+  username: root
+  commit_delay: 10  # seconds before synchronized commit/reload
+
+config_layers:
+  base: configs/base-router.yaml
+  ap_config: configs/wireless-ap.yaml
+
+devices:
+  main-router:
+    target: 192.168.1.1
+    password: ${oc.env:ROUTER_PASSWORD}
+    configs:
+      - ${config_layers.base}
+      - configs/main-router.yaml
+    tags: [core, production]
+
+  ap-living-room:
+    target: 192.168.1.10
+    key_file: ~/.ssh/openwrt_key
+    configs:
+      - ${config_layers.base}
+      - ${config_layers.ap_config}
+    tags: [ap, production]
+```
+
+#### Two-Phase Execution
+
+Fleet mode uses a two-phase approach for safe network changes:
+
+1. **Phase 1 (Stage)**: Push UCI commands to all devices in parallel without committing. If any device fails, all changes are rolled back.
+2. **Phase 2 (Commit)**: Send coordinated commit commands to all devices with a configurable delay, so they all restart services at the same time.
+
+This ensures that network configuration changes that might break connectivity are applied atomically across your entire fleet.
+
+For full fleet documentation, see [docs/guide/fleet.md](docs/guide/fleet.md).
 
 ## Quick Start (Python API)
 

@@ -460,3 +460,18 @@ done
 
 echo "Deployment complete!"
 ```
+
+### 6. Use Fleet Mode for Multiple Devices
+
+For managing multiple devices with coordinated updates, use [Fleet Mode](fleet.md):
+
+```bash
+# Apply to all devices in fleet with coordinated commit
+wrtkit fleet apply fleet.yaml
+
+# Target specific devices
+wrtkit fleet apply fleet.yaml --target "ap-*"
+wrtkit fleet apply fleet.yaml --tags production
+```
+
+Fleet mode ensures all devices commit their changes simultaneously, which is essential for network changes that might break connectivity.

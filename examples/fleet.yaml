@@ -1,0 +1,91 @@
+# Example Fleet Inventory File
+# ===========================
+#
+# This file defines multiple OpenWRT devices and their configurations.
+# Use with: wrtkit fleet apply fleet.yaml
+#
+# Environment variables can be used for sensitive values:
+#   export ROUTER_PASSWORD="your-password"
+#   export AP_PASSWORD="ap-password"
+
+defaults:
+  timeout: 30
+  username: root
+  commit_delay: 10  # Seconds to wait before coordinated commit/reload
+
+# Named config layers for reuse across devices
+# These can be referenced in device configs using ${config_layers.name}
+config_layers:
+  base: base-router-config.yaml
+  wireless_ap: wireless-ap.yaml
+
+devices:
+  # Main router - core network device
+  main-router:
+    target: 192.168.1.1
+    password: ${oc.env:ROUTER_PASSWORD,default_password}
+    configs:
+      - ${config_layers.base}
+      - router-config.yaml
+    tags:
+      - core
+      - production
+
+  # Access point in the living room
+  ap-living-room:
+    target: 192.168.1.10
+    key_file: ~/.ssh/openwrt_key
+    configs:
+      - ${config_layers.base}
+      - ${config_layers.wireless_ap}
+    tags:
+      - ap
+      - production
+
+  # Access point in the office
+  ap-office:
+    target: 192.168.1.11
+    password: ${oc.env:AP_PASSWORD,default_password}
+    timeout: 60  # Override default timeout
+    configs:
+      - ${config_layers.base}
+      - ${config_layers.wireless_ap}
+    tags:
+      - ap
+      - production
+
+  # Development/test device
+  dev-router:
+    target: 192.168.100.1:2222  # Custom SSH port
+    password: ${oc.env:DEV_PASSWORD,devpassword}
+    configs:
+      - ${config_layers.base}
+      - test-config.yaml
+    tags:
+      - development
+      - testing
+
+# Usage Examples:
+# ---------------
+#
+# Apply to all devices:
+#   wrtkit fleet apply fleet.yaml
+#
+# Apply to specific device:
+#   wrtkit fleet apply fleet.yaml --target main-router
+#
+# Apply to devices matching glob pattern:
+#   wrtkit fleet apply fleet.yaml --target "ap-*"
+#
+# Apply to devices with specific tags:
+#   wrtkit fleet apply fleet.yaml --tags production
+#   wrtkit fleet apply fleet.yaml --tags "ap,production"
+#
+# Preview changes without applying:
+#   wrtkit fleet preview fleet.yaml
+#
+# Validate fleet file:
+#   wrtkit fleet validate fleet.yaml
+#
+# Show merged config for a device:
+#   wrtkit fleet show fleet.yaml --target main-router
