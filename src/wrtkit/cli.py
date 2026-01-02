@@ -1239,7 +1239,7 @@ def testing_run(
         # Output as JSON
         wrtkit testing run tests.yaml --json
     """
-    from .testing import load_test_config, resolve_tests, ResolvedPingTest, ResolvedIperfTest
+    from .testing import load_test_config, resolve_tests
     from .test_executor import (
         TestExecutor,
         format_result,
