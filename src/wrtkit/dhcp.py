@@ -1,16 +1,16 @@
 """DHCP configuration components."""
 
 from typing import Any, List, Optional
-from pydantic import Field
+from pydantic import Field, AliasChoices
 from .base import UCISection, UCICommand
 
 
 class DHCPHost(UCISection):
     """Represents a DHCP static lease (host) entry."""
 
-    mac: Optional[str] = None
-    ip: Optional[str] = None
-    name: Optional[str] = None
+    mac: Optional[str] = Field(None, validation_alias=AliasChoices("mac", "macaddr"))
+    ip: Optional[str] = Field(None, validation_alias=AliasChoices("ip", "ipaddr"))
+    name: Optional[str] = Field(None, validation_alias=AliasChoices("name", "hostname"))
     leasetime: Optional[str] = None
 
     def __init__(self, host_name: str, **data: Any) -> None:

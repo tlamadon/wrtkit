@@ -106,3 +106,32 @@ def test_dhcp_config_with_sections_and_hosts():
     assert any(cmd.path == "dhcp.lan" and cmd.value == "dhcp" for cmd in commands)
     assert any(cmd.path == "dhcp.printer" and cmd.value == "host" for cmd in commands)
     assert any(cmd.path == "dhcp.nas" and cmd.value == "host" for cmd in commands)
+
+
+def test_dhcp_host_field_aliases():
+    """Test that field aliases map old names to correct UCI option names."""
+    # Create host with old field names (macaddr, ipaddr, hostname)
+    # These should be aliased to the correct names (mac, ip, name)
+    host = DHCPHost(
+        "monoprice",
+        macaddr="D4:AD:20:92:44:AA",
+        ipaddr="192.168.10.99",
+        hostname="monoprice-con"
+    )
+
+    commands = host.get_commands()
+
+    # Should generate commands with CORRECT option names (mac, ip, name)
+    assert any(cmd.path == "dhcp.monoprice.mac" and cmd.value == "D4:AD:20:92:44:AA" for cmd in commands)
+    assert any(cmd.path == "dhcp.monoprice.ip" and cmd.value == "192.168.10.99" for cmd in commands)
+    assert any(cmd.path == "dhcp.monoprice.name" and cmd.value == "monoprice-con" for cmd in commands)
+
+    # Should NOT generate commands with wrong option names
+    assert not any(cmd.path == "dhcp.monoprice.macaddr" for cmd in commands)
+    assert not any(cmd.path == "dhcp.monoprice.ipaddr" for cmd in commands)
+    assert not any(cmd.path == "dhcp.monoprice.hostname" for cmd in commands)
+
+    # Verify the model fields are using correct names
+    assert host.mac == "D4:AD:20:92:44:AA"
+    assert host.ip == "192.168.10.99"
+    assert host.name == "monoprice-con"
