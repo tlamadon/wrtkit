@@ -251,12 +251,20 @@ class SerialConnection:
             if exit_code != 0:
                 raise RuntimeError(f"Failed to commit changes: {stderr}")
 
-    def reload_config(self) -> None:
-        """Reload network configuration and wireless settings."""
+    def reload_config(self, reload_dhcp: bool = True) -> None:
+        """
+        Reload network configuration and wireless settings.
+
+        Args:
+            reload_dhcp: If True, also restart dnsmasq to apply DHCP changes
+        """
         commands = [
             "/etc/init.d/network restart",
             "wifi reload",
         ]
+
+        if reload_dhcp:
+            commands.append("/etc/init.d/dnsmasq restart")
 
         for cmd in commands:
             stdout, stderr, exit_code = self.execute(cmd)

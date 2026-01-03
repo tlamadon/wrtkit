@@ -7,7 +7,7 @@ from pathlib import Path
 from wrtkit.config import UCIConfig
 from wrtkit.network import NetworkDevice, NetworkInterface
 from wrtkit.wireless import WirelessRadio, WirelessInterface
-from wrtkit.dhcp import DHCPSection
+from wrtkit.dhcp import DHCPSection, DHCPHost
 from wrtkit.firewall import FirewallZone, FirewallForwarding
 
 
@@ -474,3 +474,90 @@ another_unknown: 123
     data = interface.model_dump()
     assert data["custom_field"] == "custom_value"
     assert data["another_unknown"] == 123
+
+
+def test_dhcp_host_yaml_roundtrip():
+    """Test DHCP host static lease YAML serialization."""
+    config = UCIConfig()
+
+    # Add DHCP section
+    section = DHCPSection("lan") \
+        .with_interface("lan") \
+        .with_start(100) \
+        .with_limit(150)
+    config.dhcp.add_dhcp(section)
+
+    # Add static hosts
+    host1 = DHCPHost("printer") \
+        .with_mac("aa:bb:cc:dd:ee:ff") \
+        .with_ip("192.168.1.50") \
+        .with_name("printer")
+    host2 = DHCPHost("nas") \
+        .with_mac("11:22:33:44:55:66") \
+        .with_ip("192.168.1.51") \
+        .with_leasetime("infinite")
+    config.dhcp.add_host(host1)
+    config.dhcp.add_host(host2)
+
+    # Serialize to YAML
+    yaml_str = config.to_yaml()
+    assert "dhcp:" in yaml_str
+    assert "hosts:" in yaml_str
+    assert "printer:" in yaml_str
+    assert "nas:" in yaml_str
+
+    # Deserialize and verify
+    restored = UCIConfig.from_yaml(yaml_str)
+    assert len(restored.dhcp.sections) == 1
+    assert len(restored.dhcp.hosts) == 2
+
+    # Find hosts by section name
+    printer_host = next(h for h in restored.dhcp.hosts if h._section == "printer")
+    nas_host = next(h for h in restored.dhcp.hosts if h._section == "nas")
+
+    assert printer_host.mac == "aa:bb:cc:dd:ee:ff"
+    assert printer_host.ip == "192.168.1.50"
+    assert printer_host.name == "printer"
+
+    assert nas_host.mac == "11:22:33:44:55:66"
+    assert nas_host.ip == "192.168.1.51"
+    assert nas_host.leasetime == "infinite"
+
+
+def test_dhcp_host_from_yaml():
+    """Test loading DHCP hosts from YAML config."""
+    yaml_str = """
+dhcp:
+  sections:
+    lan:
+      interface: lan
+      start: 100
+      limit: 150
+  hosts:
+    printer:
+      mac: "aa:bb:cc:dd:ee:ff"
+      ip: "192.168.1.50"
+      name: "printer"
+    server:
+      mac: "11:22:33:44:55:66"
+      ip: "192.168.1.10"
+      leasetime: "infinite"
+"""
+    config = UCIConfig.from_yaml(yaml_str)
+
+    assert len(config.dhcp.sections) == 1
+    assert len(config.dhcp.hosts) == 2
+
+    # Verify hosts
+    printer = next(h for h in config.dhcp.hosts if h._section == "printer")
+    assert printer.mac == "aa:bb:cc:dd:ee:ff"
+    assert printer.ip == "192.168.1.50"
+
+    server = next(h for h in config.dhcp.hosts if h._section == "server")
+    assert server.leasetime == "infinite"
+
+    # Verify commands are generated correctly
+    commands = config.get_all_commands()
+    assert any(cmd.path == "dhcp.printer" and cmd.value == "host" for cmd in commands)
+    assert any(cmd.path == "dhcp.printer.mac" for cmd in commands)
+    assert any(cmd.path == "dhcp.server" and cmd.value == "host" for cmd in commands)

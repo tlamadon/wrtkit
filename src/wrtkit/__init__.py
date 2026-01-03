@@ -5,7 +5,7 @@ from .ssh import SSHConnection
 from .serial_connection import SerialConnection
 from .network import NetworkConfig, NetworkDevice, NetworkInterface
 from .wireless import WirelessConfig, WirelessRadio, WirelessInterface
-from .dhcp import DHCPConfig, DHCPSection
+from .dhcp import DHCPConfig, DHCPSection, DHCPHost
 from .firewall import FirewallConfig, FirewallZone, FirewallForwarding
 from .sqm import SQMConfig, SQMQueue
 from .mesh import (
@@ -32,6 +32,7 @@ __all__ = [
     "WirelessInterface",
     "DHCPConfig",
     "DHCPSection",
+    "DHCPHost",
     "FirewallConfig",
     "FirewallZone",
     "FirewallForwarding",

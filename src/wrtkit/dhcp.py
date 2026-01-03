@@ -5,6 +5,46 @@ from pydantic import Field
 from .base import UCISection, UCICommand
 
 
+class DHCPHost(UCISection):
+    """Represents a DHCP static lease (host) entry."""
+
+    mac: Optional[str] = None
+    ip: Optional[str] = None
+    name: Optional[str] = None
+    leasetime: Optional[str] = None
+
+    def __init__(self, host_name: str, **data: Any) -> None:
+        super().__init__(**data)
+        self._package = "dhcp"
+        self._section = host_name
+        self._section_type = "host"
+
+    # Immutable builder methods (composable)
+    def with_mac(self, value: str) -> "DHCPHost":
+        """Set the MAC address for this static lease (returns new copy)."""
+        return self.model_copy(update={"mac": value})
+
+    def with_ip(self, value: str) -> "DHCPHost":
+        """Set the IP address for this static lease (returns new copy)."""
+        return self.model_copy(update={"ip": value})
+
+    def with_name(self, value: str) -> "DHCPHost":
+        """Set the hostname for this static lease (returns new copy)."""
+        return self.model_copy(update={"name": value})
+
+    def with_leasetime(self, value: str) -> "DHCPHost":
+        """Set the lease time for this static lease (returns new copy)."""
+        return self.model_copy(update={"leasetime": value})
+
+    # Convenience builder for common configuration
+    def with_static_lease(self, mac: str, ip: str, name: Optional[str] = None) -> "DHCPHost":
+        """Configure a complete static lease (returns new copy)."""
+        updates = {"mac": mac, "ip": ip}
+        if name is not None:
+            updates["name"] = name
+        return self.model_copy(update=updates)
+
+
 class DHCPSection(UCISection):
     """Represents a DHCP configuration section."""
 
@@ -51,6 +91,7 @@ class DHCPConfig(UCISection):
     """DHCP configuration manager."""
 
     sections: List[DHCPSection] = Field(default_factory=list)
+    hosts: List[DHCPHost] = Field(default_factory=list)
 
     def __init__(self, **data: Any) -> None:
         super().__init__(**data)
@@ -63,9 +104,16 @@ class DHCPConfig(UCISection):
         self.sections.append(dhcp)
         return self
 
+    def add_host(self, host: DHCPHost) -> "DHCPConfig":
+        """Add a DHCP static lease (host) and return self for chaining."""
+        self.hosts.append(host)
+        return self
+
     def get_commands(self) -> List[UCICommand]:
         """Get all UCI commands for DHCP configuration."""
         commands = []
         for section in self.sections:
             commands.extend(section.get_commands())
+        for host in self.hosts:
+            commands.extend(host.get_commands())
         return commands

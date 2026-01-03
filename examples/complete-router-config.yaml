@@ -73,6 +73,16 @@ dhcp:
       start: 50
       limit: 100
       leasetime: 2h
+  hosts:
+    printer:
+      mac: "aa:bb:cc:dd:ee:ff"
+      ip: "192.168.1.50"
+      name: "printer"
+    nas:
+      mac: "11:22:33:44:55:66"
+      ip: "192.168.1.51"
+      name: "nas"
+      leasetime: "infinite"
 firewall:
   zones:
     lan:

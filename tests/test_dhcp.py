@@ -1,6 +1,6 @@
 """Tests for DHCP configuration."""
 
-from wrtkit.dhcp import DHCPConfig, DHCPSection
+from wrtkit.dhcp import DHCPConfig, DHCPSection, DHCPHost
 from wrtkit.base import UCICommand
 
 
@@ -37,3 +37,72 @@ def test_dhcp_disabled():
     commands = dhcp.get_commands()
 
     assert any(cmd.path == "dhcp.guest.ignore" and cmd.value == "1" for cmd in commands)
+
+
+def test_dhcp_host_static_lease():
+    """Test configuring a DHCP static lease (host)."""
+    dhcp = DHCPConfig()
+    host = DHCPHost("printer")\
+        .with_mac("aa:bb:cc:dd:ee:ff")\
+        .with_ip("192.168.1.50")\
+        .with_name("printer")
+    dhcp.add_host(host)
+
+    commands = dhcp.get_commands()
+    assert len(commands) == 4
+
+    assert commands[0] == UCICommand("set", "dhcp.printer", "host")
+    assert any(cmd.path == "dhcp.printer.mac" and cmd.value == "aa:bb:cc:dd:ee:ff" for cmd in commands)
+    assert any(cmd.path == "dhcp.printer.ip" and cmd.value == "192.168.1.50" for cmd in commands)
+    assert any(cmd.path == "dhcp.printer.name" and cmd.value == "printer" for cmd in commands)
+
+
+def test_dhcp_host_with_leasetime():
+    """Test static lease with custom lease time."""
+    host = DHCPHost("nas")\
+        .with_mac("11:22:33:44:55:66")\
+        .with_ip("192.168.1.100")\
+        .with_leasetime("infinite")
+
+    commands = host.get_commands()
+
+    assert commands[0] == UCICommand("set", "dhcp.nas", "host")
+    assert any(cmd.path == "dhcp.nas.leasetime" and cmd.value == "infinite" for cmd in commands)
+
+
+def test_dhcp_host_convenience_builder():
+    """Test the with_static_lease convenience method."""
+    host = DHCPHost("device").with_static_lease(
+        mac="aa:bb:cc:dd:ee:ff",
+        ip="192.168.1.200",
+        name="mydevice"
+    )
+
+    assert host.mac == "aa:bb:cc:dd:ee:ff"
+    assert host.ip == "192.168.1.200"
+    assert host.name == "mydevice"
+
+
+def test_dhcp_config_with_sections_and_hosts():
+    """Test DHCP config with both server sections and static hosts."""
+    dhcp = DHCPConfig()
+
+    # Add DHCP server section
+    section = DHCPSection("lan")\
+        .with_interface("lan")\
+        .with_start(100)\
+        .with_limit(150)
+    dhcp.add_dhcp(section)
+
+    # Add static hosts
+    host1 = DHCPHost("printer").with_static_lease("aa:bb:cc:dd:ee:ff", "192.168.1.50")
+    host2 = DHCPHost("nas").with_static_lease("11:22:33:44:55:66", "192.168.1.51", "nas")
+    dhcp.add_host(host1)
+    dhcp.add_host(host2)
+
+    commands = dhcp.get_commands()
+
+    # Should have section commands + host commands
+    assert any(cmd.path == "dhcp.lan" and cmd.value == "dhcp" for cmd in commands)
+    assert any(cmd.path == "dhcp.printer" and cmd.value == "host" for cmd in commands)
+    assert any(cmd.path == "dhcp.nas" and cmd.value == "host" for cmd in commands)

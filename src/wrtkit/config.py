@@ -7,7 +7,7 @@ from typing import List, Dict, Any, Optional, Union, cast
 from .base import UCICommand
 from .network import NetworkConfig, NetworkInterface, NetworkDevice
 from .wireless import WirelessConfig, WirelessRadio, WirelessInterface
-from .dhcp import DHCPConfig, DHCPSection
+from .dhcp import DHCPConfig, DHCPSection, DHCPHost
 from .firewall import FirewallConfig, FirewallZone, FirewallForwarding
 from .sqm import SQMConfig, SQMQueue
 from .ssh import SSHConnection
@@ -547,6 +547,7 @@ class UCIConfig:
         if include_reload:
             lines.append("/etc/init.d/network restart")
             lines.append("wifi reload")
+            lines.append("/etc/init.d/dnsmasq restart")
 
         return "\n".join(lines)
 
@@ -810,6 +811,7 @@ class UCIConfig:
             if auto_reload:
                 print("  /etc/init.d/network restart")
                 print("  wifi reload")
+                print("  /etc/init.d/dnsmasq restart")
             return
 
         # Calculate total steps
@@ -947,6 +949,7 @@ class UCIConfig:
             if auto_reload:
                 print("  /etc/init.d/network restart")
                 print("  wifi reload")
+                print("  /etc/init.d/dnsmasq restart")
             return diff
 
         # Execute commands with progress
@@ -1059,7 +1062,11 @@ class UCIConfig:
                         "sections": {
                             "type": "object",
                             "additionalProperties": DHCPSection.json_schema(),
-                        }
+                        },
+                        "hosts": {
+                            "type": "object",
+                            "additionalProperties": DHCPHost.json_schema(),
+                        },
                     },
                 },
                 "firewall": {
@@ -1147,12 +1154,18 @@ class UCIConfig:
             result["wireless"] = wireless_dict
 
         # DHCP configuration
-        if self.dhcp.sections:
+        if self.dhcp.sections or self.dhcp.hosts:
             dhcp_dict: Dict[str, Any] = {}
-            sections_dict = {}
-            for section in self.dhcp.sections:
-                sections_dict[section._section] = section.to_dict(exclude_none=exclude_none)
-            dhcp_dict["sections"] = sections_dict
+            if self.dhcp.sections:
+                sections_dict = {}
+                for section in self.dhcp.sections:
+                    sections_dict[section._section] = section.to_dict(exclude_none=exclude_none)
+                dhcp_dict["sections"] = sections_dict
+            if self.dhcp.hosts:
+                hosts_dict = {}
+                for host in self.dhcp.hosts:
+                    hosts_dict[host._section] = host.to_dict(exclude_none=exclude_none)
+                dhcp_dict["hosts"] = hosts_dict
             result["dhcp"] = dhcp_dict
 
         # Firewall configuration
@@ -1287,6 +1300,11 @@ class UCIConfig:
                 for section_name, section_data in dhcp_data["sections"].items():
                     section = DHCPSection(section_name, **section_data)
                     config.dhcp.add_dhcp(section)
+
+            if "hosts" in dhcp_data:
+                for host_name, host_data in dhcp_data["hosts"].items():
+                    host = DHCPHost(host_name, **host_data)
+                    config.dhcp.add_host(host)
 
         # Load firewall configuration
         if "firewall" in data:

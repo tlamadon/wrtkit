@@ -487,6 +487,7 @@ def apply(
                 if not no_reload:
                     click.echo("Would run: /etc/init.d/network restart")
                     click.echo("Would run: wifi reload")
+                    click.echo("Would run: /etc/init.d/dnsmasq restart")
                 return
 
             # Confirmation prompt
