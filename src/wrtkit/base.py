@@ -1,7 +1,7 @@
 """Base classes for UCI configuration components."""
 
 import fnmatch
-from typing import Any, Dict, List, Optional, Type, TypeVar, Union
+from typing import Any, Dict, List, Optional, Type, TypeVar
 from pydantic import BaseModel, ConfigDict, Field
 
 T = TypeVar("T", bound="UCISection")

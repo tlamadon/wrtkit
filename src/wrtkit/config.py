@@ -671,6 +671,8 @@ class UCIConfig:
         """
         commands = []
         packages = ["network", "wireless", "dhcp", "firewall", "sqm"]
+        # Optional packages that don't require warnings if missing
+        optional_packages = ["sqm"]
 
         for package in packages:
             if spinner:
@@ -688,7 +690,9 @@ class UCIConfig:
 
             except Exception as e:
                 # If we can't get a package, just skip it
-                print(f"Warning: Could not retrieve {package} config: {e}")
+                # Only show warning for non-optional packages
+                if package not in optional_packages:
+                    print(f"Warning: Could not retrieve {package} config: {e}")
                 continue
 
         return commands
