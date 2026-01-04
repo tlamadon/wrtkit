@@ -1,5 +1,6 @@
 """Main UCI configuration class."""
 
+import fnmatch
 import json
 import yaml
 from omegaconf import OmegaConf
@@ -109,6 +110,150 @@ class ConfigDiff:
     def is_empty(self) -> bool:
         """Check if there are no differences."""
         return not (self.to_add or self.to_remove or self.to_modify or self.remote_only)
+
+    @staticmethod
+    def _match_path_pattern(path: str, pattern: str) -> bool:
+        """
+        Match a UCI path against a glob pattern, supporting * and ** wildcards.
+
+        Args:
+            path: The UCI path to check (e.g., "network.interfaces.wan.ipaddr")
+            pattern: The pattern to match against (e.g., "network.interfaces.*" or
+                     "network.interfaces.wan.*")
+
+        Returns:
+            True if the path matches the pattern
+
+        Examples:
+            - "network.interfaces.*" matches "network.interfaces.wan" and
+              "network.interfaces.wan.ipaddr"
+            - "network.interfaces.wan.*" matches "network.interfaces.wan.ipaddr"
+              but not "network.interfaces.lan.ipaddr"
+            - "*.interfaces.*" matches any package's interfaces
+        """
+        # Handle exact wildcard match
+        if pattern == "**":
+            return True
+
+        # Split path and pattern into segments
+        path_parts = path.split(".")
+        pattern_parts = pattern.split(".")
+
+        # Track positions in both lists
+        p_idx = 0  # path index
+        pat_idx = 0  # pattern index
+
+        while p_idx < len(path_parts) and pat_idx < len(pattern_parts):
+            pattern_segment = pattern_parts[pat_idx]
+
+            if pattern_segment == "**":
+                # ** can match zero or more segments
+                # Try to match the rest of the pattern with remaining path
+                if pat_idx == len(pattern_parts) - 1:
+                    # ** is at the end, matches everything remaining
+                    return True
+
+                # Try to match remaining pattern at each position in remaining path
+                for i in range(p_idx, len(path_parts) + 1):
+                    remaining_path = ".".join(path_parts[i:])
+                    remaining_pattern = ".".join(pattern_parts[pat_idx + 1 :])
+                    if ConfigDiff._match_path_pattern(remaining_path, remaining_pattern):
+                        return True
+                return False
+            elif pattern_segment == "*":
+                # * matches exactly one segment
+                p_idx += 1
+                pat_idx += 1
+            elif fnmatch.fnmatch(path_parts[p_idx], pattern_segment):
+                # Regular segment match with glob support
+                p_idx += 1
+                pat_idx += 1
+            else:
+                # No match
+                return False
+
+        # If pattern is exhausted but path has more parts, it's still a match
+        # if the last pattern segment was * or ** (prefix match)
+        if pat_idx == len(pattern_parts) and p_idx < len(path_parts):
+            # Pattern ended but path continues - check if this is a prefix match
+            # This allows "network.interfaces.*" to match "network.interfaces.wan.ipaddr"
+            return True
+
+        # Both must be exhausted for a full match
+        return p_idx == len(path_parts) and pat_idx == len(pattern_parts)
+
+    def filter_by_pattern(self, pattern: str) -> "ConfigDiff":
+        """
+        Create a new ConfigDiff containing only changes matching the given pattern.
+
+        The pattern uses glob-style matching against UCI paths:
+        - "*" matches exactly one path segment
+        - "**" matches zero or more segments
+        - Standard glob characters (?, [abc]) are also supported
+
+        Args:
+            pattern: Glob pattern to match against UCI paths
+                     (e.g., "network.interfaces.*", "network.interfaces.wan.*")
+
+        Returns:
+            A new ConfigDiff containing only matching changes
+
+        Examples:
+            # Filter to only network interface changes
+            filtered = diff.filter_by_pattern("network.interfaces.*")
+
+            # Filter to only WAN interface changes
+            filtered = diff.filter_by_pattern("network.interfaces.wan.*")
+
+            # Filter to all wireless changes
+            filtered = diff.filter_by_pattern("wireless.*")
+        """
+        filtered = ConfigDiff()
+
+        # Filter to_add
+        filtered.to_add = [
+            cmd for cmd in self.to_add if self._match_path_pattern(cmd.path, pattern)
+        ]
+
+        # Filter to_remove
+        filtered.to_remove = [
+            cmd for cmd in self.to_remove if self._match_path_pattern(cmd.path, pattern)
+        ]
+
+        # Filter to_modify
+        filtered.to_modify = [
+            (old_cmd, new_cmd)
+            for old_cmd, new_cmd in self.to_modify
+            if self._match_path_pattern(new_cmd.path, pattern)
+        ]
+
+        # Filter remote_only
+        filtered.remote_only = [
+            cmd for cmd in self.remote_only if self._match_path_pattern(cmd.path, pattern)
+        ]
+
+        # Filter whitelisted
+        filtered.whitelisted = [
+            cmd for cmd in self.whitelisted if self._match_path_pattern(cmd.path, pattern)
+        ]
+
+        # Filter common
+        filtered.common = [
+            cmd for cmd in self.common if self._match_path_pattern(cmd.path, pattern)
+        ]
+
+        # Copy section tracking (filter based on pattern)
+        for pkg, section in self._local_sections:
+            section_path = f"{pkg}.{section}"
+            if self._match_path_pattern(section_path, pattern):
+                filtered._local_sections.add((pkg, section))
+
+        for pkg, section in self._remote_sections:
+            section_path = f"{pkg}.{section}"
+            if self._match_path_pattern(section_path, pattern):
+                filtered._remote_sections.add((pkg, section))
+
+        return filtered
 
     def has_changes(self) -> bool:
         """Check if there are any changes to apply (excluding remote-only)."""
@@ -1084,6 +1229,7 @@ class UCIConfig:
         auto_commit: bool = True,
         auto_reload: bool = True,
         verbose: bool = False,
+        filter_pattern: Optional[str] = None,
     ) -> ConfigDiff:
         """
         Apply only the differences between this config and the remote device.
@@ -1105,6 +1251,9 @@ class UCIConfig:
             auto_commit: If True, automatically commit changes
             auto_reload: If True, automatically reload network and wireless
             verbose: If True, show progress spinner and status messages
+            filter_pattern: Glob pattern to filter which changes to apply.
+                Only changes matching the pattern will be applied.
+                Examples: "network.interfaces.*", "network.interfaces.wan.*"
 
         Returns:
             The ConfigDiff object showing what was (or would be) applied
@@ -1124,6 +1273,9 @@ class UCIConfig:
 
             # Show progress during apply
             config.apply_diff(ssh, verbose=True)
+
+            # Apply only network interface changes
+            config.apply_diff(ssh, filter_pattern="network.interfaces.*")
         """
         # Determine how to handle remote-only items
         remove_packages: Optional[List[str]] = None
@@ -1137,6 +1289,10 @@ class UCIConfig:
         else:
             # Don't remove anything
             diff = self.diff(ssh, show_remote_only=True, verbose=verbose)
+
+        # Apply filter if specified
+        if filter_pattern:
+            diff = diff.filter_by_pattern(filter_pattern)
 
         if diff.is_empty() and not diff.to_remove:
             if not dry_run:

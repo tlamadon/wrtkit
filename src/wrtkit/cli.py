@@ -320,6 +320,12 @@ def cli() -> None:
 @click.option("--no-color", is_flag=True, help="Disable colored output")
 @click.option("--tree", is_flag=True, default=True, help="Show diff as tree (default)")
 @click.option("--linear", is_flag=True, help="Show diff as linear list")
+@click.option(
+    "-f",
+    "--filter",
+    "filter_pattern",
+    help="Glob pattern to filter changes (e.g., 'network.interfaces.*', 'network.interfaces.wan.*')",
+)
 def preview(
     config_file: str,
     target: str,
@@ -330,6 +336,7 @@ def preview(
     no_color: bool,
     tree: bool,
     linear: bool,
+    filter_pattern: Optional[str],
 ) -> None:
     """Preview configuration differences without applying.
 
@@ -342,6 +349,14 @@ def preview(
         wrtkit preview config.yaml 192.168.1.1
         wrtkit preview config.yaml router.local --show-commands
         wrtkit preview config.yaml /dev/ttyUSB0 -p password
+
+        \b
+        # Preview only network interface changes
+        wrtkit preview config.yaml 192.168.1.1 -f 'network.interfaces.*'
+
+        \b
+        # Preview only WAN interface changes
+        wrtkit preview config.yaml 192.168.1.1 -f 'network.interfaces.wan.*'
     """
     try:
         # Load configuration
@@ -356,6 +371,11 @@ def preview(
         conn = create_connection(target, password, key_file, timeout)
         with conn:
             diff = config.diff(conn, show_remote_only=True, verbose=True)  # type: ignore[arg-type]
+
+        # Apply filter if specified
+        if filter_pattern:
+            diff = diff.filter_by_pattern(filter_pattern)
+            click.echo(f"Filtered by pattern: {filter_pattern}")
 
         # Display results
         if diff.is_empty():
@@ -414,6 +434,12 @@ def preview(
 )
 @click.option("--no-color", is_flag=True, help="Disable colored output")
 @click.option("-y", "--yes", is_flag=True, help="Skip confirmation prompt")
+@click.option(
+    "-f",
+    "--filter",
+    "filter_pattern",
+    help="Glob pattern to filter changes (e.g., 'network.interfaces.*', 'network.interfaces.wan.*')",
+)
 def apply(
     config_file: str,
     target: str,
@@ -427,6 +453,7 @@ def apply(
     remove_unmanaged: bool,
     no_color: bool,
     yes: bool,
+    filter_pattern: Optional[str],
 ) -> None:
     """Apply configuration to a device.
 
@@ -450,6 +477,14 @@ def apply(
         \b
         # Show commands during dry-run
         wrtkit apply config.yaml 192.168.1.1 --dry-run --show-commands
+
+        \b
+        # Apply only network interface changes
+        wrtkit apply config.yaml 192.168.1.1 -f 'network.interfaces.*'
+
+        \b
+        # Apply only WAN interface changes
+        wrtkit apply config.yaml 192.168.1.1 -f 'network.interfaces.wan.*'
     """
     try:
         # Load configuration
@@ -469,6 +504,11 @@ def apply(
                 show_remote_only=not remove_unmanaged,
                 verbose=True,
             )
+
+            # Apply filter if specified
+            if filter_pattern:
+                diff = diff.filter_by_pattern(filter_pattern)
+                click.echo(f"Filtered by pattern: {filter_pattern}")
 
             if diff.is_empty() and not diff.to_remove:
                 click.echo("\nConfiguration is already in sync - nothing to apply.")
@@ -515,6 +555,7 @@ def apply(
                 auto_commit=not no_commit,
                 auto_reload=not no_reload,
                 verbose=True,
+                filter_pattern=filter_pattern,
             )
 
             click.echo("\nConfiguration applied successfully!")
