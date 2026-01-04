@@ -15,10 +15,11 @@ A Python library for managing OpenWRT configuration over SSH and serial console 
   - Serial console connections (via pyserial) - works with picocom, minicom, etc.
 - **Enhanced Configuration Diff**: Compare local configuration with remote device configuration
   - Track remote-only UCI settings (not managed by your config)
+  - **Whitelist patterns** to selectively preserve remote settings
   - Tree-structured diff output grouped by package and resource
   - Linear format for quick review
   - Colored terminal output
-  - Common settings tracking
+  - Smart categorization: common, whitelisted, to add/remove/modify
 - **Safe Apply**: Review changes before applying them to remote devices
 - **Type Safety**: Pydantic-based models for validation, serialization, and excellent IDE support
 
@@ -259,6 +260,12 @@ config.to_json_file("my-config.json")
 
 ```yaml
 network:
+  # Optional: Preserve specific remote settings
+  remote_policy:
+    whitelist:
+      - "interfaces.*.gateway"   # Keep gateway on all interfaces
+      - "interfaces.guest.*"     # Keep entire guest interface
+
   devices:
     br_lan:
       name: br-lan
@@ -533,14 +540,24 @@ Both formats include a helpful summary header showing the count of each type of 
 
 ### Understanding Diff Output
 
-The diff engine tracks four types of changes, each with a distinct color in terminal output:
+The diff engine tracks several types of changes, each with a distinct color in terminal output:
 
+**Shown in Tree View:**
 - **<span style="color:green">`+`</span> (Add)** - **Green**: Settings defined in your local config but missing on the remote device
-- **<span style="color:red">`-`</span> (Remove)** - **Red**: Settings on the remote device that should be removed (deprecated - see remote-only below)
+- **<span style="color:red">`-`</span> (Remove)** - **Red**: Settings on the remote device that will be removed
 - **<span style="color:yellow">`~`</span> (Modify)** - **Yellow**: Settings that exist in both but have different values
 - **<span style="color:cyan">`*`</span> (Remote-only)** - **Cyan**: Settings on the remote device that aren't managed by your local config
 
+**Counted in Summary (Not Shown):**
+- **Common** - Settings that match between local and remote (identical, no action needed)
+- **Whitelisted** - Remote settings preserved by whitelist patterns (see Whitelisting Remote Settings)
+
 Colors are enabled by default in terminal output and can be disabled with the `color=False` parameter.
+
+**Example Summary:**
+```
+Summary: +5 to add, ~2 to modify, -3 to remove, 4 whitelisted, 10 in common
+```
 
 ### Remote-Only Settings
 
@@ -556,6 +573,87 @@ diff = config.diff(ssh, show_remote_only=True)
 
 # Or treat them as settings to remove (old behavior)
 diff = config.diff(ssh, show_remote_only=False)
+```
+
+### Whitelisting Remote Settings
+
+Use the `remote_policy` to selectively preserve specific remote settings that you don't manage locally. This is perfect for partial configuration management where you only want to control certain aspects of your router.
+
+**New Whitelist Approach (Recommended):**
+
+```python
+from wrtkit import RemotePolicy
+
+# Specify path glob patterns to preserve
+config.network.remote_policy = RemotePolicy(whitelist=[
+    "interfaces.*.gateway",     # Keep gateway on all interfaces
+    "interfaces.guest.*",        # Keep entire guest interface
+    "devices.*.ports",          # Keep all device ports
+])
+
+# Now when you diff or apply, these settings will be preserved
+diff = config.diff(ssh)
+# Whitelisted items are counted but not shown (like common items)
+# Summary: -3 to remove, 5 whitelisted, 3 in common
+```
+
+**YAML Configuration:**
+
+```yaml
+network:
+  remote_policy:
+    whitelist:
+      - "interfaces.*.gateway"    # Keep gateway on any interface
+      - "interfaces.guest.*"      # Keep all guest interface settings
+      - "devices.br_lan.ports"    # Keep ports on br_lan device
+
+  interfaces:
+    lan:
+      device: br-lan
+      proto: static
+      ipaddr: 192.168.1.1
+```
+
+**Pattern Syntax:**
+- `*` - matches one segment (e.g., `devices.*.lan`)
+- `**` - matches any number of segments (e.g., `devices.**`)
+- `pattern.*` - automatically includes the section (e.g., `interfaces.guest.*` matches both `interfaces.guest` and its options)
+- Glob patterns supported (e.g., `devices.br_*.*`)
+
+**Common Use Cases:**
+
+```yaml
+# Keep WAN/VPN configurations (manage LAN only)
+network:
+  remote_policy:
+    whitelist:
+      - "interfaces.wan.*"
+      - "interfaces.wan6.*"
+      - "interfaces.vpn*"
+
+# Keep DHCP hostnames (manage MAC/IP only)
+dhcp:
+  remote_policy:
+    whitelist:
+      - "hosts.*.hostname"
+
+# Keep radio settings (manage WiFi interfaces only)
+wireless:
+  remote_policy:
+    whitelist:
+      - "radios.*"
+```
+
+For complete documentation, see [REMOTE_POLICY_WHITELIST.md](REMOTE_POLICY_WHITELIST.md).
+
+**Legacy Approach (Deprecated):**
+
+```python
+# Old two-level approach (still supported)
+config.network.remote_policy = RemotePolicy(
+    allowed_sections=["wan", "guest"],  # Section-level only
+    allowed_values=["lan*"]             # List value filtering
+)
 ```
 
 ### Tree-Structured Output

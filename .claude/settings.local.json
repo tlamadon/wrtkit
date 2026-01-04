@@ -1,0 +1,31 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(pip install:*)",
+      "Bash(pytest tests/:*)",
+      "Bash(python:*)",
+      "Bash(tree:*)",
+      "Bash(mkdocs build:*)",
+      "Bash(git add:*)",
+      "Bash(grep:*)",
+      "Bash(git commit:*)",
+      "Bash(twine check:*)",
+      "Bash(ls:*)",
+      "Bash(pytest:*)",
+      "Bash(ruff check:*)",
+      "Bash(mypy:*)",
+      "Bash(find:*)",
+      "Bash(mv:*)",
+      "Bash(cat:*)",
+      "Bash(xargs -I {} sh -c 'echo \"\"=== {} ===\"\" && wc -l {}')",
+      "Bash(wrtkit --help:*)",
+      "Bash(wrtkit preview --help:*)",
+      "Bash(wrtkit apply --help:*)",
+      "Bash(wrtkit validate:*)",
+      "Bash(wrtkit commands:*)",
+      "Bash(WRTKIT_PASSWORD=testpass123 wrtkit preview:*)",
+      "Bash(wrtkit import --help:*)",
+      "Bash(python3:*)"
+    ]
+  }
+}

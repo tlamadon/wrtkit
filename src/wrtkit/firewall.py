@@ -2,7 +2,7 @@
 
 from typing import Any, List, Optional
 from pydantic import Field
-from .base import UCISection, UCICommand
+from .base import UCISection, UCICommand, RemotePolicy
 
 
 class FirewallZone(UCISection):
@@ -99,6 +99,7 @@ class FirewallConfig(UCISection):
 
     zones: List[FirewallZone] = Field(default_factory=list)
     forwardings: List[FirewallForwarding] = Field(default_factory=list)
+    remote_policy: Optional[RemotePolicy] = None
 
     def __init__(self, **data: Any) -> None:
         super().__init__(**data)

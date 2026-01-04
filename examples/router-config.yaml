@@ -2,6 +2,26 @@
 # This file demonstrates all available configuration options in YAML format
 
 network:
+  # Remote policy controls which remote-only settings are allowed
+  # to remain on the device without being scheduled for deletion.
+  #
+  # NEW WHITELIST APPROACH (recommended):
+  # Specify path patterns using logical structure. Examples:
+  #   - "devices.*.lan" - keep 'lan' option on any device
+  #   - "interfaces.guest.*" - keep all options under guest interface
+  #   - "interfaces.*.gateway" - keep gateway option on any interface
+  #   - "**" - keep everything (matches any path)
+  #
+  # LEGACY APPROACH (deprecated but still supported):
+  #   - allowed_sections: List of section name patterns
+  #   - allowed_values: List of value patterns for list items
+  remote_policy:
+    # Using new whitelist approach
+    whitelist:
+      - "devices.*.ports"    # Keep all ports on all devices
+      - "interfaces.*.gateway"  # Keep gateway setting on all interfaces
+      - "interfaces.guest.*"    # Keep all settings for guest interface
+
   devices:
     br_lan:
       name: br-lan
@@ -48,6 +68,11 @@ network:
       gw_bandwidth: 10000/2000
 
 wireless:
+  # Whitelist approach: keep all radio configurations
+  remote_policy:
+    whitelist:
+      - "radios.*"  # Keep all options on all radios
+
   radios:
     radio0:
       channel: 36
@@ -97,6 +122,13 @@ wireless:
       key: MeshPassword123!
 
 dhcp:
+  # Keep specific DHCP sections and all host configurations
+  remote_policy:
+    whitelist:
+      - "sections.lan.*"   # Keep all lan DHCP options
+      - "sections.guest.*" # Keep all guest DHCP options
+      - "hosts.*.hostname" # Keep hostname for all DHCP hosts
+
   sections:
     lan:
       interface: lan
@@ -111,6 +143,11 @@ dhcp:
       leasetime: 1h
 
 firewall:
+  # Keep all firewall configurations
+  remote_policy:
+    whitelist:
+      - "**"  # Keep everything
+
   zones:
     lan:
       name: lan

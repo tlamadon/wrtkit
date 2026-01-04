@@ -1,9 +1,240 @@
 """Base classes for UCI configuration components."""
 
-from typing import Any, Dict, List, Optional, Type, TypeVar
-from pydantic import BaseModel, ConfigDict
+import fnmatch
+from typing import Any, Dict, List, Optional, Type, TypeVar, Union
+from pydantic import BaseModel, ConfigDict, Field
 
 T = TypeVar("T", bound="UCISection")
+
+
+class RemotePolicy(BaseModel):
+    """
+    Policy for handling remote-only sections and values.
+
+    This defines which remote sections and values are allowed to exist
+    without being scheduled for deletion. Anything not matching these
+    patterns will be marked for removal when syncing.
+
+    Attributes:
+        allowed_sections: DEPRECATED - Use whitelist instead.
+            List of allowed section name patterns.
+            Use "*" to allow all sections, or specific patterns like
+            "wan*", "guest", etc. Supports glob-style wildcards.
+        allowed_values: DEPRECATED - Use whitelist instead.
+            List of allowed value patterns for options.
+            Use "*" to allow all values. Supports glob-style wildcards.
+            When specified, only matching values will be preserved.
+        whitelist: List of path glob patterns to preserve on remote.
+            Each pattern can match paths at any level within a config section.
+            Examples:
+              - "devices.br_lan.ports" - keep all ports on br_lan device
+              - "devices.*.lan" - keep 'lan' option on any device
+              - "interfaces.guest.*" - keep everything under guest interface
+              - "interfaces.*.gateway" - keep gateway on any interface
+              - "**" - keep everything (matches any path)
+
+            Path patterns are relative to the package level (network, wireless, etc).
+            The package is determined by which config section contains the policy.
+    """
+
+    # Legacy fields for backward compatibility
+    allowed_sections: List[str] = Field(default_factory=list)
+    allowed_values: List[str] = Field(default_factory=list)
+
+    # New whitelist-based approach
+    whitelist: List[str] = Field(default_factory=list)
+
+    def _match_path_pattern(self, path: str, pattern: str) -> bool:
+        """
+        Match a path against a glob pattern, supporting ** for multiple segments.
+
+        Args:
+            path: The path to check (e.g., "devices.br_lan.ports")
+            pattern: The pattern to match against (e.g., "devices.*.ports" or "devices.**")
+
+        Returns:
+            True if the path matches the pattern
+        """
+        # Handle exact wildcard match
+        if pattern == "**":
+            return True
+
+        # Split path and pattern into segments
+        path_parts = path.split(".")
+        pattern_parts = pattern.split(".")
+
+        # Track positions in both lists
+        p_idx = 0  # path index
+        pat_idx = 0  # pattern index
+
+        while p_idx < len(path_parts) and pat_idx < len(pattern_parts):
+            pattern_segment = pattern_parts[pat_idx]
+
+            if pattern_segment == "**":
+                # ** can match zero or more segments
+                # Try to match the rest of the pattern with remaining path
+                if pat_idx == len(pattern_parts) - 1:
+                    # ** is at the end, matches everything remaining
+                    return True
+
+                # Try to match remaining pattern at each position in remaining path
+                for i in range(p_idx, len(path_parts) + 1):
+                    remaining_path = ".".join(path_parts[i:])
+                    remaining_pattern = ".".join(pattern_parts[pat_idx + 1:])
+                    if self._match_path_pattern(remaining_path, remaining_pattern):
+                        return True
+                return False
+            elif pattern_segment == "*":
+                # * matches exactly one segment
+                p_idx += 1
+                pat_idx += 1
+            elif fnmatch.fnmatch(path_parts[p_idx], pattern_segment):
+                # Regular segment match with glob support
+                p_idx += 1
+                pat_idx += 1
+            else:
+                # No match
+                return False
+
+        # Both must be exhausted for a full match
+        return p_idx == len(path_parts) and pat_idx == len(pattern_parts)
+
+    def is_path_whitelisted(self, path: str) -> bool:
+        """
+        Check if a path matches any whitelist pattern.
+
+        Special case: If a pattern ends with ".*", it also matches the path
+        without the wildcard. For example, "interfaces.guest.*" matches both
+        "interfaces.guest" and "interfaces.guest.proto".
+
+        Args:
+            path: The relative path to check (e.g., "devices.br_lan.ports")
+
+        Returns:
+            True if the path matches any whitelist pattern
+        """
+        if not self.whitelist:
+            return False
+
+        for pattern in self.whitelist:
+            if self._match_path_pattern(path, pattern):
+                return True
+
+            # Special case: pattern ending with .* should also match without the .*
+            # This ensures that "interfaces.guest.*" whitelists the section definition too
+            if pattern.endswith(".*"):
+                prefix = pattern[:-2]  # Remove the ".*"
+                if path == prefix:
+                    return True
+
+        return False
+
+    def is_section_allowed(self, section_name: str) -> bool:
+        """
+        Check if a section name is allowed by this policy.
+
+        DEPRECATED: Use is_path_whitelisted instead with new whitelist approach.
+
+        Args:
+            section_name: The section name to check
+
+        Returns:
+            True if the section matches any allowed pattern, False otherwise.
+            Returns False if allowed_sections is empty (nothing explicitly allowed).
+        """
+        if not self.allowed_sections:
+            return False
+
+        for pattern in self.allowed_sections:
+            if pattern == "*":
+                return True
+            if fnmatch.fnmatch(section_name, pattern):
+                return True
+        return False
+
+    def is_value_allowed(self, value: str) -> bool:
+        """
+        Check if a value is allowed by this policy.
+
+        DEPRECATED: Use is_path_whitelisted instead with new whitelist approach.
+
+        Args:
+            value: The value to check
+
+        Returns:
+            True if the value matches any allowed pattern, False otherwise.
+            Returns True if allowed_values is empty (no value filtering).
+        """
+        if not self.allowed_values:
+            # No value filtering - all values allowed
+            return True
+
+        for pattern in self.allowed_values:
+            if pattern == "*":
+                return True
+            if fnmatch.fnmatch(str(value), pattern):
+                return True
+        return False
+
+    def should_keep_remote_section(self, section_name: str) -> bool:
+        """
+        Determine if a remote-only section should be kept.
+
+        DEPRECATED: Use should_keep_remote_path instead with new whitelist approach.
+
+        Args:
+            section_name: The section name to check
+
+        Returns:
+            True if the section should be kept, False if it should be deleted.
+        """
+        return self.is_section_allowed(section_name)
+
+    def should_keep_remote_value(self, section_name: str, value: str) -> bool:
+        """
+        Determine if a remote-only value should be kept.
+
+        DEPRECATED: Use should_keep_remote_path instead with new whitelist approach.
+
+        Args:
+            section_name: The section name containing the value
+            value: The value to check
+
+        Returns:
+            True if the value should be kept, False if it should be deleted.
+        """
+        # First check if the section is allowed
+        if not self.is_section_allowed(section_name):
+            return False
+        # Then check if the value is allowed
+        return self.is_value_allowed(value)
+
+    def should_keep_remote_path(self, path: str) -> bool:
+        """
+        Determine if a remote path should be kept based on whitelist.
+
+        This is the new primary method for checking remote paths.
+        Falls back to legacy allowed_sections/allowed_values if whitelist is empty.
+
+        Args:
+            path: The relative path to check (e.g., "devices.br_lan" or "interfaces.lan.gateway")
+
+        Returns:
+            True if the path should be kept, False if it should be deleted.
+        """
+        # Use new whitelist approach if configured
+        if self.whitelist:
+            return self.is_path_whitelisted(path)
+
+        # Fall back to legacy behavior for backward compatibility
+        parts = path.split(".")
+        if len(parts) >= 1:
+            # For section-level paths (e.g., "devices.br_lan")
+            # Check if the section type and name pattern match
+            section_name = parts[1] if len(parts) >= 2 else parts[0]
+            return self.is_section_allowed(section_name)
+
+        return False
 
 
 class UCICommand:

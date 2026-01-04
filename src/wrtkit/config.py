@@ -4,7 +4,7 @@ import json
 import yaml
 from omegaconf import OmegaConf
 from typing import List, Dict, Any, Optional, Union, cast
-from .base import UCICommand
+from .base import UCICommand, RemotePolicy
 from .network import NetworkConfig, NetworkInterface, NetworkDevice
 from .wireless import WirelessConfig, WirelessRadio, WirelessInterface
 from .dhcp import DHCPConfig, DHCPSection, DHCPHost
@@ -93,7 +93,10 @@ class ConfigDiff:
         self.to_modify: List[tuple[UCICommand, UCICommand]] = []
         self.remote_only: List[UCICommand] = (
             []
-        )  # UCI settings on remote but not mentioned in config
+        )  # UCI settings on remote but not mentioned in config (NOT whitelisted, will be deleted)
+        self.whitelisted: List[UCICommand] = (
+            []
+        )  # UCI settings on remote that are whitelisted (preserved)
         self.common: List[UCICommand] = []  # UCI settings that match between local and remote
         # Section-level tracking for tree display
         self._local_sections: set[tuple[str, str]] = (
@@ -289,6 +292,8 @@ class ConfigDiff:
             summary_parts.append(f"{remove_prefix}{len(self.to_remove)} to remove")
         if self.remote_only:
             summary_parts.append(f"{remote_prefix}{len(self.remote_only)} remote-only")
+        if self.whitelisted:
+            summary_parts.append(f"{len(self.whitelisted)} whitelisted")
         if self.common:
             summary_parts.append(f"{len(self.common)} in common")
 
@@ -339,6 +344,7 @@ class ConfigDiff:
         add_grouped = self._group_commands_by_resource(self.to_add)
         remove_grouped = self._group_commands_by_resource(self.to_remove)
         remote_only_grouped = self._group_commands_by_resource(self.remote_only)
+        # Don't group whitelisted items - they won't be displayed in the tree
 
         # Group modifications
         modify_grouped: Dict[str, Dict[str, List[tuple[UCICommand, UCICommand]]]] = {}
@@ -362,6 +368,7 @@ class ConfigDiff:
         all_packages.update(remove_grouped.keys())
         all_packages.update(modify_grouped.keys())
         all_packages.update(remote_only_grouped.keys())
+        # Note: whitelisted items are not displayed, only counted
 
         # Format tree for each package
         for package in sorted(all_packages):
@@ -452,6 +459,8 @@ class ConfigDiff:
             summary_parts.append(f"{remove_sym}{len(self.to_remove)} to remove")
         if self.remote_only:
             summary_parts.append(f"{remote_sym}{len(self.remote_only)} remote-only")
+        if self.whitelisted:
+            summary_parts.append(f"{len(self.whitelisted)} whitelisted")
         if self.common:
             summary_parts.append(f"{len(self.common)} in common")
 
@@ -512,6 +521,28 @@ class UCIConfig:
         """Add an SQM queue to the configuration."""
         self.sqm.add_queue(queue)
         return self
+
+    def get_remote_policy(self, package: str) -> Optional[RemotePolicy]:
+        """
+        Get the remote policy for a specific package.
+
+        Args:
+            package: The package name (e.g., "network", "wireless", "dhcp", "firewall", "sqm")
+
+        Returns:
+            The RemotePolicy for the package, or None if not set
+        """
+        if package == "network":
+            return self.network.remote_policy
+        elif package == "wireless":
+            return self.wireless.remote_policy
+        elif package == "dhcp":
+            return self.dhcp.remote_policy
+        elif package == "firewall":
+            return self.firewall.remote_policy
+        elif package == "sqm":
+            return self.sqm.remote_policy
+        return None
 
     def get_all_commands(self) -> List[UCICommand]:
         """Get all UCI commands from all configuration sections."""
@@ -662,6 +693,78 @@ class UCIConfig:
 
         return commands
 
+    def _get_logical_path(
+        self,
+        uci_path: str,
+        section_types: Dict[str, str],
+        package: str
+    ) -> str:
+        """
+        Convert a UCI path to a logical path for whitelist matching.
+
+        Args:
+            uci_path: The UCI path (e.g., "network.br_lan.ports")
+            section_types: Mapping of section names to their types
+            package: The package name
+
+        Returns:
+            Logical path (e.g., "devices.br_lan.ports" or "interfaces.lan.gateway")
+        """
+        parts = uci_path.split(".")
+        if len(parts) < 2:
+            return uci_path
+
+        # Skip the package prefix to get relative path
+        section_name = parts[1]
+        section_type = section_types.get(section_name, "")
+
+        # Map section type to logical prefix for network package
+        if package == "network":
+            if section_type == "device":
+                logical_prefix = "devices"
+            elif section_type == "interface":
+                logical_prefix = "interfaces"
+            else:
+                # Unknown type, use section name directly
+                return ".".join(parts[1:])
+        elif package == "dhcp":
+            if section_type == "host":
+                logical_prefix = "hosts"
+            elif section_type == "dhcp":
+                logical_prefix = "sections"
+            else:
+                return ".".join(parts[1:])
+        elif package == "wireless":
+            if section_type == "wifi-device":
+                logical_prefix = "radios"
+            elif section_type == "wifi-iface":
+                logical_prefix = "interfaces"
+            else:
+                return ".".join(parts[1:])
+        elif package == "firewall":
+            if section_type == "zone":
+                logical_prefix = "zones"
+            elif section_type == "forwarding":
+                logical_prefix = "forwardings"
+            else:
+                return ".".join(parts[1:])
+        elif package == "sqm":
+            if section_type == "queue":
+                logical_prefix = "queues"
+            else:
+                return ".".join(parts[1:])
+        else:
+            # Other packages use direct section names
+            return ".".join(parts[1:])
+
+        # Construct logical path: logical_prefix.section_name.option...
+        if len(parts) == 2:
+            # Section definition (no option)
+            return f"{logical_prefix}.{section_name}"
+        else:
+            # Section with option(s)
+            return f"{logical_prefix}.{section_name}.{'.'.join(parts[2:])}"
+
     def diff(
         self,
         ssh: SSHConnection,
@@ -701,6 +804,19 @@ class UCIConfig:
             remote_commands = self._parse_remote_config(ssh)
 
         diff = ConfigDiff()
+
+        # Build section type mapping from commands (for logical path construction)
+        section_types: Dict[str, Dict[str, str]] = {}  # {package: {section_name: section_type}}
+        for cmd in local_commands + remote_commands:
+            parts = cmd.path.split(".")
+            if len(parts) == 2 and cmd.action == "set":
+                # This is a section definition: package.section = type
+                package = parts[0]
+                section_name = parts[1]
+                section_type = cmd.value if cmd.value else ""
+                if package not in section_types:
+                    section_types[package] = {}
+                section_types[package][section_name] = section_type
 
         # Build section-level tracking for tree display
         for cmd in local_commands:
@@ -755,20 +871,70 @@ class UCIConfig:
             key = (cmd.path, cmd.value)
             if key not in local_set:
                 # Determine if this command should be marked for removal
-                cmd_package = cmd.path.split(".")[0]
+                parts = cmd.path.split(".")
+                cmd_package = parts[0]
+                cmd_section = parts[1] if len(parts) >= 2 else ""
                 should_remove = False
 
-                if remove_packages is not None:
+                # Check if this section exists in local config
+                section_in_local = (cmd_package, cmd_section) in diff._local_sections
+                section_is_remote_only = not section_in_local
+
+                # Check if the package has a remote policy
+                remote_policy = self.get_remote_policy(cmd_package)
+                is_whitelisted = False
+
+                if remote_policy is not None:
+                    # Remote policy controls which REMOTE-ONLY sections/values to keep
+                    if section_is_remote_only:
+                        # Section only exists on remote - apply remote policy
+                        # Use new whitelist approach if configured, otherwise fall back to legacy
+                        if remote_policy.whitelist:
+                            # New whitelist approach - construct logical path
+                            pkg_section_types = section_types.get(cmd_package, {})
+                            logical_path = self._get_logical_path(cmd.path, pkg_section_types, cmd_package)
+                            if remote_policy.should_keep_remote_path(logical_path):
+                                is_whitelisted = True
+                            else:
+                                should_remove = True
+                        else:
+                            # Legacy behavior for backward compatibility
+                            if cmd.action == "add_list":
+                                # For list values, check both section and value
+                                if not remote_policy.should_keep_remote_value(cmd_section, str(cmd.value)):
+                                    should_remove = True
+                            else:
+                                # For regular settings, check if section is allowed
+                                if not remote_policy.should_keep_remote_section(cmd_section):
+                                    should_remove = True
+                    else:
+                        # Section exists in both local and remote
+                        # Remote options not in local should be removed
+                        # UNLESS they are whitelisted
+                        if remote_policy.whitelist:
+                            # Check if this specific path is whitelisted
+                            pkg_section_types = section_types.get(cmd_package, {})
+                            logical_path = self._get_logical_path(cmd.path, pkg_section_types, cmd_package)
+                            if remote_policy.should_keep_remote_path(logical_path):
+                                is_whitelisted = True
+                            else:
+                                should_remove = True
+                        else:
+                            # Legacy behavior: always remove remote options in locally-managed sections
+                            should_remove = True
+                elif remove_packages is not None:
                     # Per-package removal: only remove if package is in the list
                     should_remove = cmd_package in remove_packages
                 elif not show_remote_only:
                     # Global removal: remove all remote-only
                     should_remove = True
 
-                # For add_list commands, if the (path, value) pair doesn't exist locally, it's remote-only
+                # Categorize the command based on what should happen to it
                 if cmd.action == "add_list":
                     if should_remove:
                         diff.to_remove.append(cmd)
+                    elif is_whitelisted:
+                        diff.whitelisted.append(cmd)
                     else:
                         diff.remote_only.append(cmd)
                 else:
@@ -777,6 +943,8 @@ class UCIConfig:
                         # Path doesn't exist in local config at all
                         if should_remove:
                             diff.to_remove.append(cmd)
+                        elif is_whitelisted:
+                            diff.whitelisted.append(cmd)
                         else:
                             diff.remote_only.append(cmd)
 
@@ -1278,6 +1446,9 @@ class UCIConfig:
                     interface = NetworkInterface(section_name, **interface_data)
                     config.network.add_interface(interface)
 
+            if "remote_policy" in network_data:
+                config.network.remote_policy = RemotePolicy(**network_data["remote_policy"])
+
         # Load wireless configuration
         if "wireless" in data:
             wireless_data = data["wireless"]
@@ -1292,6 +1463,9 @@ class UCIConfig:
                     wireless_iface = WirelessInterface(section_name, **interface_data)
                     config.wireless.add_interface(wireless_iface)
 
+            if "remote_policy" in wireless_data:
+                config.wireless.remote_policy = RemotePolicy(**wireless_data["remote_policy"])
+
         # Load DHCP configuration
         if "dhcp" in data:
             dhcp_data = data["dhcp"]
@@ -1305,6 +1479,9 @@ class UCIConfig:
                 for host_name, host_data in dhcp_data["hosts"].items():
                     host = DHCPHost(host_name, **host_data)
                     config.dhcp.add_host(host)
+
+            if "remote_policy" in dhcp_data:
+                config.dhcp.remote_policy = RemotePolicy(**dhcp_data["remote_policy"])
 
         # Load firewall configuration
         if "firewall" in data:
@@ -1330,6 +1507,9 @@ class UCIConfig:
                     forwarding = FirewallForwarding(idx, **forwarding_data)
                     config.firewall.add_forwarding(forwarding)
 
+            if "remote_policy" in firewall_data:
+                config.firewall.remote_policy = RemotePolicy(**firewall_data["remote_policy"])
+
         # Load SQM configuration
         if "sqm" in data:
             sqm_data = data["sqm"]
@@ -1338,6 +1518,9 @@ class UCIConfig:
                 for queue_name, queue_data in sqm_data["queues"].items():
                     queue = SQMQueue(queue_name, **queue_data)
                     config.sqm.add_queue(queue)
+
+            if "remote_policy" in sqm_data:
+                config.sqm.remote_policy = RemotePolicy(**sqm_data["remote_policy"])
 
         return config
 

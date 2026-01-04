@@ -7,6 +7,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **Remote Policy Whitelist**: New whitelist-based approach for selectively preserving remote settings
+  - Path glob patterns (e.g., `interfaces.*.gateway`, `devices.br_lan.*`)
+  - Support for `*` (single segment) and `**` (multi-segment) wildcards
+  - Patterns ending with `.*` automatically include section definitions
+  - Logical path hierarchy (devices, interfaces, hosts, radios, etc.)
+- **Enhanced Diff Display**: Whitelisted items now tracked separately and hidden by default
+  - New `diff.whitelisted` list for preserved remote settings
+  - Summary now shows: "5 whitelisted, 3 in common"
+  - Cleaner output focused on actual changes
+- Comprehensive documentation in `REMOTE_POLICY_WHITELIST.md`
+- Example configurations and demos
+
+### Changed
+- `ConfigDiff` now has separate `whitelisted` field (previously mixed with `remote_only`)
+- Remote policy now uses `should_keep_remote_path()` as primary method
+- Diff output only shows items that will change (whitelisted items hidden like common items)
+
+### Deprecated
+- `RemotePolicy.allowed_sections` - Use `whitelist` instead
+- `RemotePolicy.allowed_values` - Use `whitelist` instead
+- Legacy methods still supported for backward compatibility
+
 ## [0.1.0] - 2025-01-XX
 
 ### Added

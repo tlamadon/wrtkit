@@ -1,0 +1,169 @@
+# Real-World Example: Partial Router Configuration Management
+#
+# Scenario: You want to manage your LAN configuration and WiFi settings,
+# but preserve other configurations that were set up on the router itself
+# (like WAN, VPN, additional bridges, etc.)
+
+network:
+  # Whitelist approach: Preserve what we don't manage
+  remote_policy:
+    whitelist:
+      # Keep WAN configuration (usually DHCP from ISP or complex PPPoE)
+      - "interfaces.wan.*"
+      - "interfaces.wan6.*"
+
+      # Keep VPN interfaces (OpenVPN, WireGuard, etc.)
+      - "interfaces.vpn*"
+      - "interfaces.wg*"
+
+      # Keep any additional network interfaces
+      - "interfaces.iot.*"
+      - "interfaces.dmz.*"
+
+      # Keep gateway settings on all interfaces (might be set remotely)
+      - "interfaces.*.gateway"
+      - "interfaces.*.dns"
+
+      # Keep any batman-adv mesh interfaces
+      - "interfaces.mesh_*"
+      - "interfaces.bat*"
+
+      # Keep any additional ports added to the bridge
+      # (e.g., bat0 for mesh, wlan0 when using dumb AP mode)
+      - "devices.br_lan.ports"
+
+  # Only manage LAN interface
+  interfaces:
+    lan:
+      device: br-lan
+      proto: static
+      ipaddr: 192.168.1.1
+      netmask: 255.255.255.0
+
+  # Only define the basic bridge
+  devices:
+    br_lan:
+      name: br-lan
+      type: bridge
+      ports:
+        - lan1
+        - lan2
+        - lan3
+        - lan4
+
+wireless:
+  # Keep radio hardware configs (channel, txpower, etc.) - let device manage
+  # Only manage the WiFi interfaces (SSIDs, encryption)
+  remote_policy:
+    whitelist:
+      - "radios.*"  # Preserve all radio settings
+
+  # Manage WiFi interfaces
+  interfaces:
+    default_radio0:
+      device: radio0
+      mode: ap
+      network: lan
+      ssid: MyHome-5G
+      encryption: sae
+      key: MySecurePassword123!
+
+    default_radio1:
+      device: radio1
+      mode: ap
+      network: lan
+      ssid: MyHome-2.4G
+      encryption: sae
+      key: MySecurePassword123!
+
+dhcp:
+  # Keep any additional DHCP configurations
+  # Only manage specific hostnames, preserve any others set on device
+  remote_policy:
+    whitelist:
+      # Keep all DHCP sections we don't explicitly manage
+      - "sections.iot.*"
+      - "sections.dmz.*"
+      - "sections.vpn.*"
+
+      # Keep hostnames for all devices (friendly names)
+      - "hosts.*.hostname"
+
+  # Manage main LAN DHCP
+  sections:
+    lan:
+      interface: lan
+      start: 100
+      limit: 150
+      leasetime: 12h
+
+  # Manage a few critical device reservations
+  # (Other devices can be added directly on the router)
+  hosts:
+    server:
+      mac: "AA:BB:CC:DD:EE:01"
+      ip: 192.168.1.10
+      # hostname might be set on router, will be preserved
+
+    nas:
+      mac: "AA:BB:CC:DD:EE:02"
+      ip: 192.168.1.20
+      # hostname might be set on router, will be preserved
+
+firewall:
+  # Keep most firewall rules, only manage basic zones
+  remote_policy:
+    whitelist:
+      # Keep all forwarding rules (might have complex port forwards)
+      - "forwardings.*"
+
+      # Keep any custom zones
+      - "zones.vpn.*"
+      - "zones.iot.*"
+      - "zones.dmz.*"
+
+      # Keep all firewall rules (redirects, port forwards, etc.)
+      - "**"  # For firewall, keep everything not explicitly managed
+
+  # Only manage basic LAN and WAN zones
+  zones:
+    lan:
+      name: lan
+      input: ACCEPT
+      output: ACCEPT
+      forward: ACCEPT
+      network:
+        - lan
+
+    wan:
+      name: wan
+      input: REJECT
+      output: ACCEPT
+      forward: REJECT
+      masq: true
+      mtu_fix: true
+      network:
+        - wan
+        - wan6
+
+  # Only manage basic LAN to WAN forwarding
+  forwardings:
+    - src: lan
+      dest: wan
+
+# Benefits of this approach:
+#
+# 1. Version Control: Only LAN, WiFi SSIDs, and critical DHCP reservations
+#    are in git. Other configs can be managed via web UI.
+#
+# 2. Flexibility: Complex configs (VPN, port forwards, etc.) can be set up
+#    directly on the router without affecting your managed config.
+#
+# 3. Safety: Won't accidentally delete important configs when applying
+#    your YAML file.
+#
+# 4. Incremental Management: Start by managing just a few things, gradually
+#    add more to version control as needed.
+#
+# 5. Team-Friendly: Different team members can manage different parts -
+#    some via web UI, some via this config file.

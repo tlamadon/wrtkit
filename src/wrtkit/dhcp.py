@@ -2,7 +2,7 @@
 
 from typing import Any, List, Optional
 from pydantic import Field, AliasChoices
-from .base import UCISection, UCICommand
+from .base import UCISection, UCICommand, RemotePolicy
 
 
 class DHCPHost(UCISection):
@@ -92,6 +92,7 @@ class DHCPConfig(UCISection):
 
     sections: List[DHCPSection] = Field(default_factory=list)
     hosts: List[DHCPHost] = Field(default_factory=list)
+    remote_policy: Optional[RemotePolicy] = None
 
     def __init__(self, **data: Any) -> None:
         super().__init__(**data)

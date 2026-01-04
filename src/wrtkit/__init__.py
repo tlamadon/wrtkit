@@ -1,6 +1,7 @@
 """WRTKit - A Python library for managing OpenWRT configuration over SSH and serial."""
 
 from .config import UCIConfig
+from .base import RemotePolicy
 from .ssh import SSHConnection
 from .serial_connection import SerialConnection
 from .network import NetworkConfig, NetworkDevice, NetworkInterface
@@ -22,6 +23,7 @@ __version__ = "0.1.0"
 
 __all__ = [
     "UCIConfig",
+    "RemotePolicy",
     "SSHConnection",
     "SerialConnection",
     "NetworkConfig",
