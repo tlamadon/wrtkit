@@ -13,11 +13,13 @@ from wrtkit.firewall import FirewallZone, FirewallForwarding
 
 def test_network_interface_to_yaml():
     """Test converting a network interface to YAML."""
-    interface = NetworkInterface("lan") \
-        .with_device("br-lan") \
-        .with_proto("static") \
-        .with_ipaddr("192.168.1.1") \
+    interface = (
+        NetworkInterface("lan")
+        .with_device("br-lan")
+        .with_proto("static")
+        .with_ipaddr("192.168.1.1")
         .with_netmask("255.255.255.0")
+    )
 
     yaml_str = interface.to_yaml()
 
@@ -32,10 +34,12 @@ def test_network_interface_to_yaml():
 
 def test_network_interface_to_json():
     """Test converting a network interface to JSON."""
-    interface = NetworkInterface("lan") \
-        .with_device("br-lan") \
-        .with_proto("static") \
+    interface = (
+        NetworkInterface("lan")
+        .with_device("br-lan")
+        .with_proto("static")
         .with_ipaddr("192.168.1.1")
+    )
 
     json_str = interface.to_json()
     data = json.loads(json_str)
@@ -84,11 +88,13 @@ def test_network_interface_from_json():
 
 def test_network_interface_yaml_roundtrip():
     """Test YAML serialization roundtrip."""
-    original = NetworkInterface("lan") \
-        .with_device("br-lan") \
-        .with_proto("static") \
-        .with_ipaddr("192.168.1.1") \
+    original = (
+        NetworkInterface("lan")
+        .with_device("br-lan")
+        .with_proto("static")
+        .with_ipaddr("192.168.1.1")
         .with_netmask("255.255.255.0")
+    )
 
     yaml_str = original.to_yaml()
     restored = NetworkInterface.from_yaml(yaml_str, "lan")
@@ -101,10 +107,7 @@ def test_network_interface_yaml_roundtrip():
 
 def test_wireless_radio_to_yaml():
     """Test converting a wireless radio to YAML."""
-    radio = WirelessRadio("radio0") \
-        .with_channel(36) \
-        .with_htmode("HE80") \
-        .with_country("US")
+    radio = WirelessRadio("radio0").with_channel(36).with_htmode("HE80").with_country("US")
 
     yaml_str = radio.to_yaml()
 
@@ -138,30 +141,26 @@ def test_uciconfig_to_yaml():
     config = UCIConfig()
 
     # Add network configuration
-    device = NetworkDevice("br_lan") \
-        .with_name("br-lan") \
-        .with_type("bridge") \
-        .with_ports(["lan1", "lan2"])
+    device = (
+        NetworkDevice("br_lan").with_name("br-lan").with_type("bridge").with_ports(["lan1", "lan2"])
+    )
     config.network.add_device(device)
 
-    interface = NetworkInterface("lan") \
-        .with_device("br-lan") \
-        .with_proto("static") \
-        .with_ipaddr("192.168.1.1") \
+    interface = (
+        NetworkInterface("lan")
+        .with_device("br-lan")
+        .with_proto("static")
+        .with_ipaddr("192.168.1.1")
         .with_netmask("255.255.255.0")
+    )
     config.network.add_interface(interface)
 
     # Add wireless configuration
-    radio = WirelessRadio("radio0") \
-        .with_channel(36) \
-        .with_htmode("HE80") \
-        .with_country("US")
+    radio = WirelessRadio("radio0").with_channel(36).with_htmode("HE80").with_country("US")
     config.wireless.add_radio(radio)
 
     # Add DHCP configuration
-    dhcp = DHCPSection("lan") \
-        .with_interface("lan") \
-        .with_range(100, 150, "12h")
+    dhcp = DHCPSection("lan").with_interface("lan").with_range(100, 150, "12h")
     config.dhcp.add_dhcp(dhcp)
 
     yaml_str = config.to_yaml()
@@ -179,15 +178,15 @@ def test_uciconfig_to_json():
     """Test converting a complete UCI configuration to JSON."""
     config = UCIConfig()
 
-    device = NetworkDevice("br_lan") \
-        .with_name("br-lan") \
-        .with_type("bridge")
+    device = NetworkDevice("br_lan").with_name("br-lan").with_type("bridge")
     config.network.add_device(device)
 
-    interface = NetworkInterface("lan") \
-        .with_device("br-lan") \
-        .with_proto("static") \
+    interface = (
+        NetworkInterface("lan")
+        .with_device("br-lan")
+        .with_proto("static")
         .with_ipaddr("192.168.1.1")
+    )
     config.network.add_interface(interface)
 
     json_str = config.to_json()
@@ -309,22 +308,21 @@ def test_uciconfig_yaml_roundtrip():
     # Create original configuration
     original = UCIConfig()
 
-    device = NetworkDevice("br_lan") \
-        .with_name("br-lan") \
-        .with_type("bridge") \
-        .with_ports(["lan1", "lan2"])
+    device = (
+        NetworkDevice("br_lan").with_name("br-lan").with_type("bridge").with_ports(["lan1", "lan2"])
+    )
     original.network.add_device(device)
 
-    interface = NetworkInterface("lan") \
-        .with_device("br-lan") \
-        .with_proto("static") \
-        .with_ipaddr("192.168.1.1") \
+    interface = (
+        NetworkInterface("lan")
+        .with_device("br-lan")
+        .with_proto("static")
+        .with_ipaddr("192.168.1.1")
         .with_netmask("255.255.255.0")
+    )
     original.network.add_interface(interface)
 
-    radio = WirelessRadio("radio0") \
-        .with_channel(36) \
-        .with_htmode("HE80")
+    radio = WirelessRadio("radio0").with_channel(36).with_htmode("HE80")
     original.wireless.add_radio(radio)
 
     # Serialize to YAML and deserialize
@@ -351,10 +349,12 @@ def test_file_operations():
     """Test reading and writing YAML/JSON files."""
     config = UCIConfig()
 
-    interface = NetworkInterface("lan") \
-        .with_device("br-lan") \
-        .with_proto("static") \
+    interface = (
+        NetworkInterface("lan")
+        .with_device("br-lan")
+        .with_proto("static")
         .with_ipaddr("192.168.1.1")
+    )
     config.network.add_interface(interface)
 
     with tempfile.TemporaryDirectory() as tmpdir:
@@ -413,17 +413,17 @@ def test_firewall_configuration():
     """Test firewall configuration serialization."""
     config = UCIConfig()
 
-    zone = FirewallZone(0) \
-        .with_name("lan") \
-        .with_input("ACCEPT") \
-        .with_output("ACCEPT") \
-        .with_forward("ACCEPT") \
+    zone = (
+        FirewallZone(0)
+        .with_name("lan")
+        .with_input("ACCEPT")
+        .with_output("ACCEPT")
+        .with_forward("ACCEPT")
         .with_network("lan")
+    )
     config.firewall.add_zone(zone)
 
-    forwarding = FirewallForwarding(0) \
-        .with_src("lan") \
-        .with_dest("wan")
+    forwarding = FirewallForwarding(0).with_src("lan").with_dest("wan")
     config.firewall.add_forwarding(forwarding)
 
     yaml_str = config.to_yaml()
@@ -441,9 +441,7 @@ def test_firewall_configuration():
 
 def test_exclude_none_behavior():
     """Test that None values are excluded by default."""
-    interface = NetworkInterface("lan") \
-        .with_device("br-lan") \
-        .with_proto("static")
+    interface = NetworkInterface("lan").with_device("br-lan").with_proto("static")
     # ipaddr, netmask, gateway, etc. should be None
 
     yaml_str = interface.to_yaml(exclude_none=True)
@@ -481,21 +479,22 @@ def test_dhcp_host_yaml_roundtrip():
     config = UCIConfig()
 
     # Add DHCP section
-    section = DHCPSection("lan") \
-        .with_interface("lan") \
-        .with_start(100) \
-        .with_limit(150)
+    section = DHCPSection("lan").with_interface("lan").with_start(100).with_limit(150)
     config.dhcp.add_dhcp(section)
 
     # Add static hosts
-    host1 = DHCPHost("printer") \
-        .with_mac("aa:bb:cc:dd:ee:ff") \
-        .with_ip("192.168.1.50") \
+    host1 = (
+        DHCPHost("printer")
+        .with_mac("aa:bb:cc:dd:ee:ff")
+        .with_ip("192.168.1.50")
         .with_name("printer")
-    host2 = DHCPHost("nas") \
-        .with_mac("11:22:33:44:55:66") \
-        .with_ip("192.168.1.51") \
+    )
+    host2 = (
+        DHCPHost("nas")
+        .with_mac("11:22:33:44:55:66")
+        .with_ip("192.168.1.51")
         .with_leasetime("infinite")
+    )
     config.dhcp.add_host(host1)
     config.dhcp.add_host(host2)
 

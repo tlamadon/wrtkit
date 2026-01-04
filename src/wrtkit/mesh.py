@@ -357,16 +357,12 @@ def _get_bridge_port_mapping(
     # Method 2: Fallback to brctl showmacs for each bridge
     if not mac_to_device and brctl_available:
         # Find all bridges
-        stdout, _, _ = connection.execute(
-            "ls /sys/class/net/*/bridge 2>/dev/null | cut -d/ -f5"
-        )
+        stdout, _, _ = connection.execute("ls /sys/class/net/*/bridge 2>/dev/null | cut -d/ -f5")
         bridges = [b.strip() for b in stdout.split("\n") if b.strip()]
 
         for bridge in bridges:
             # Get port number to interface mapping
-            stdout, _, _ = connection.execute(
-                f"ls /sys/class/net/{bridge}/brif/ 2>/dev/null"
-            )
+            stdout, _, _ = connection.execute(f"ls /sys/class/net/{bridge}/brif/ 2>/dev/null")
             port_ifaces = [p.strip() for p in stdout.split("\n") if p.strip()]
 
             # Get port numbers
@@ -384,9 +380,7 @@ def _get_bridge_port_mapping(
                         pass
 
             # Now get MACs from brctl
-            stdout, _, exit_code = connection.execute(
-                f"brctl showmacs {bridge} 2>/dev/null"
-            )
+            stdout, _, exit_code = connection.execute(f"brctl showmacs {bridge} 2>/dev/null")
             if exit_code == 0:
                 for line in stdout.split("\n"):
                     if line.startswith("port no") or not line.strip():

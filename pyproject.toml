@@ -46,6 +46,7 @@ dev = [
     "types-paramiko>=3.0.0",
     "types-pyserial>=3.0.0",
     "types-pyyaml>=6.0.0",
+    "pre-commit>=3.0.0",
 ]
 docs = [
     "mkdocs>=1.5.0",

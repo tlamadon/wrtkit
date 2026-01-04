@@ -80,7 +80,7 @@ class RemotePolicy(BaseModel):
                 # Try to match remaining pattern at each position in remaining path
                 for i in range(p_idx, len(path_parts) + 1):
                     remaining_path = ".".join(path_parts[i:])
-                    remaining_pattern = ".".join(pattern_parts[pat_idx + 1:])
+                    remaining_pattern = ".".join(pattern_parts[pat_idx + 1 :])
                     if self._match_path_pattern(remaining_path, remaining_pattern):
                         return True
                 return False

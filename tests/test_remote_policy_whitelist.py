@@ -72,11 +72,9 @@ def test_path_pattern_matching_glob_patterns():
 
 def test_path_pattern_matching_multiple_patterns():
     """Test that multiple whitelist patterns work together."""
-    policy = RemotePolicy(whitelist=[
-        "devices.br_lan.ports",
-        "interfaces.*.gateway",
-        "hosts.guest_*.*"
-    ])
+    policy = RemotePolicy(
+        whitelist=["devices.br_lan.ports", "interfaces.*.gateway", "hosts.guest_*.*"]
+    )
 
     # First pattern
     assert policy.is_path_whitelisted("devices.br_lan.ports")
@@ -158,10 +156,9 @@ network.temp.proto='dhcp'
     # Local config is empty - both guest and temp are remote-only
 
     # Whitelist only guest interface, but exclude gateway
-    config.network.remote_policy = RemotePolicy(whitelist=[
-        "interfaces.guest.proto",
-        "interfaces.guest.ipaddr"
-    ])
+    config.network.remote_policy = RemotePolicy(
+        whitelist=["interfaces.guest.proto", "interfaces.guest.ipaddr"]
+    )
 
     diff = config.diff(MockSSH(), show_remote_only=True)
 
@@ -312,10 +309,9 @@ network.temp_test.proto='dhcp'
     # Whitelist:
     # - All gateway options on any interface
     # - Everything under guest interface
-    config.network.remote_policy = RemotePolicy(whitelist=[
-        "interfaces.*.gateway",
-        "interfaces.guest.*"
-    ])
+    config.network.remote_policy = RemotePolicy(
+        whitelist=["interfaces.*.gateway", "interfaces.guest.*"]
+    )
 
     diff = config.diff(MockSSH(), show_remote_only=True)
 
@@ -377,7 +373,7 @@ def test_whitelist_precedence_over_allowed_sections():
     """Test that whitelist takes precedence over allowed_sections when both are set."""
     policy = RemotePolicy(
         allowed_sections=["*"],  # Would allow everything
-        whitelist=["devices.br_lan.ports"]  # Only allow this specific path
+        whitelist=["devices.br_lan.ports"],  # Only allow this specific path
     )
 
     # Whitelist should take precedence

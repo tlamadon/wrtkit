@@ -122,9 +122,7 @@ def create_connection(
         )
 
 
-def _parse_uci_export_to_dict(
-    package: str, config_str: str
-) -> dict[str, dict[str, Any]]:
+def _parse_uci_export_to_dict(package: str, config_str: str) -> dict[str, dict[str, Any]]:
     """Parse UCI export format into a dict of sections.
 
     Returns:
@@ -309,10 +307,15 @@ def cli() -> None:
 @click.argument("target", envvar="WRTKIT_TARGET")
 @click.option("-p", "--password", envvar="WRTKIT_PASSWORD", help="SSH/login password")
 @click.option(
-    "-k", "--key-file", type=click.Path(exists=True), envvar="WRTKIT_KEY_FILE",
-    help="SSH private key file"
+    "-k",
+    "--key-file",
+    type=click.Path(exists=True),
+    envvar="WRTKIT_KEY_FILE",
+    help="SSH private key file",
 )
-@click.option("-t", "--timeout", default=30, envvar="WRTKIT_TIMEOUT", help="Connection timeout in seconds")
+@click.option(
+    "-t", "--timeout", default=30, envvar="WRTKIT_TIMEOUT", help="Connection timeout in seconds"
+)
 @click.option("--show-commands", is_flag=True, help="Show UCI commands that would be executed")
 @click.option("--no-color", is_flag=True, help="Disable colored output")
 @click.option("--tree", is_flag=True, default=True, help="Show diff as tree (default)")
@@ -391,10 +394,15 @@ def preview(
 @click.argument("target", envvar="WRTKIT_TARGET")
 @click.option("-p", "--password", envvar="WRTKIT_PASSWORD", help="SSH/login password")
 @click.option(
-    "-k", "--key-file", type=click.Path(exists=True), envvar="WRTKIT_KEY_FILE",
-    help="SSH private key file"
+    "-k",
+    "--key-file",
+    type=click.Path(exists=True),
+    envvar="WRTKIT_KEY_FILE",
+    help="SSH private key file",
 )
-@click.option("-t", "--timeout", default=30, envvar="WRTKIT_TIMEOUT", help="Connection timeout in seconds")
+@click.option(
+    "-t", "--timeout", default=30, envvar="WRTKIT_TIMEOUT", help="Connection timeout in seconds"
+)
 @click.option("--dry-run", is_flag=True, help="Show what would be done without making changes")
 @click.option("--show-commands", is_flag=True, help="Show UCI commands that would be executed")
 @click.option("--no-commit", is_flag=True, help="Don't commit changes after applying")
@@ -601,10 +609,15 @@ def commands(config_file: str) -> None:
 @click.argument("output_file", type=click.Path())
 @click.option("-p", "--password", envvar="WRTKIT_PASSWORD", help="SSH/login password")
 @click.option(
-    "-k", "--key-file", type=click.Path(exists=True), envvar="WRTKIT_KEY_FILE",
-    help="SSH private key file"
+    "-k",
+    "--key-file",
+    type=click.Path(exists=True),
+    envvar="WRTKIT_KEY_FILE",
+    help="SSH private key file",
 )
-@click.option("-t", "--timeout", default=30, envvar="WRTKIT_TIMEOUT", help="Connection timeout in seconds")
+@click.option(
+    "-t", "--timeout", default=30, envvar="WRTKIT_TIMEOUT", help="Connection timeout in seconds"
+)
 @click.option(
     "--format",
     "output_format",
@@ -804,7 +817,9 @@ def _parse_tags(tags_str: Optional[str]) -> Optional[list[str]]:
     return [t.strip() for t in tags_str.split(",") if t.strip()]
 
 
-def _print_fleet_header(fleet_file: str, devices: dict, target: Optional[str], tags: Optional[str]) -> None:
+def _print_fleet_header(
+    fleet_file: str, devices: dict, target: Optional[str], tags: Optional[str]
+) -> None:
     """Print fleet operation header."""
     click.echo(f"\nFleet: {fleet_file}")
     filter_parts = []
@@ -963,14 +978,22 @@ def fleet_apply(
 
             if commit_result.all_successful:
                 if use_color:
-                    click.echo(f"\033[32mFleet apply completed:\033[0m {commit_result.success_count}/{commit_result.total_count} devices updated")
+                    click.echo(
+                        f"\033[32mFleet apply completed:\033[0m {commit_result.success_count}/{commit_result.total_count} devices updated"
+                    )
                 else:
-                    click.echo(f"Fleet apply completed: {commit_result.success_count}/{commit_result.total_count} devices updated")
+                    click.echo(
+                        f"Fleet apply completed: {commit_result.success_count}/{commit_result.total_count} devices updated"
+                    )
             else:
                 if use_color:
-                    click.echo(f"\033[33mFleet apply partial:\033[0m {commit_result.success_count}/{commit_result.total_count} devices updated")
+                    click.echo(
+                        f"\033[33mFleet apply partial:\033[0m {commit_result.success_count}/{commit_result.total_count} devices updated"
+                    )
                 else:
-                    click.echo(f"Fleet apply partial: {commit_result.success_count}/{commit_result.total_count} devices updated")
+                    click.echo(
+                        f"Fleet apply partial: {commit_result.success_count}/{commit_result.total_count} devices updated"
+                    )
 
                 for name, dev_result in commit_result.devices.items():
                     if not dev_result.success:
@@ -1049,7 +1072,9 @@ def fleet_preview(
                     else:
                         click.echo(f"  Error: {device_result.error}\n")
 
-            click.echo(f"Total: {result.success_count}/{result.total_count} devices scanned, {total_changes} changes pending")
+            click.echo(
+                f"Total: {result.success_count}/{result.total_count} devices scanned, {total_changes} changes pending"
+            )
 
         finally:
             executor.cleanup()
@@ -1103,7 +1128,11 @@ def fleet_validate(fleet_file: str) -> None:
             click.echo(f"    configs ({len(device.configs)}):")
 
             for config_path in device.configs:
-                full_path = fleet_path.parent / config_path if not Path(config_path).is_absolute() else Path(config_path)
+                full_path = (
+                    fleet_path.parent / config_path
+                    if not Path(config_path).is_absolute()
+                    else Path(config_path)
+                )
                 if full_path.exists():
                     try:
                         # Try to load and validate
@@ -1136,7 +1165,13 @@ def fleet_validate(fleet_file: str) -> None:
 @fleet.command("show")
 @click.argument("fleet_file", type=click.Path(exists=True))
 @click.option("--target", "-t", required=True, help="Device name to show merged config for")
-@click.option("--format", "output_format", type=click.Choice(["yaml", "json"]), default="yaml", help="Output format")
+@click.option(
+    "--format",
+    "output_format",
+    type=click.Choice(["yaml", "json"]),
+    default="yaml",
+    help="Output format",
+)
 def fleet_show(
     fleet_file: str,
     target: str,
@@ -1294,39 +1329,43 @@ def testing_run(
             json_results = []
             for r in results:
                 if isinstance(r, PingResult):
-                    json_results.append({
-                        "name": r.name,
-                        "type": "ping",
-                        "source": r.source,
-                        "destination": r.destination,
-                        "packets_sent": r.packets_sent,
-                        "packets_received": r.packets_received,
-                        "packet_loss_pct": r.packet_loss_pct,
-                        "rtt_min": r.rtt_min,
-                        "rtt_avg": r.rtt_avg,
-                        "rtt_max": r.rtt_max,
-                        "success": r.success,
-                        "error": r.error,
-                    })
+                    json_results.append(
+                        {
+                            "name": r.name,
+                            "type": "ping",
+                            "source": r.source,
+                            "destination": r.destination,
+                            "packets_sent": r.packets_sent,
+                            "packets_received": r.packets_received,
+                            "packet_loss_pct": r.packet_loss_pct,
+                            "rtt_min": r.rtt_min,
+                            "rtt_avg": r.rtt_avg,
+                            "rtt_max": r.rtt_max,
+                            "success": r.success,
+                            "error": r.error,
+                        }
+                    )
                 elif isinstance(r, IperfResult):
-                    json_results.append({
-                        "name": r.name,
-                        "type": "iperf",
-                        "server": r.server,
-                        "client": r.client,
-                        "protocol": r.protocol,
-                        "duration": r.duration,
-                        "sent_bytes": r.sent_bytes,
-                        "sent_bps": r.sent_bps,
-                        "received_bytes": r.received_bytes,
-                        "received_bps": r.received_bps,
-                        "retransmits": r.retransmits,
-                        "jitter_ms": r.jitter_ms,
-                        "lost_packets": r.lost_packets,
-                        "lost_percent": r.lost_percent,
-                        "success": r.success,
-                        "error": r.error,
-                    })
+                    json_results.append(
+                        {
+                            "name": r.name,
+                            "type": "iperf",
+                            "server": r.server,
+                            "client": r.client,
+                            "protocol": r.protocol,
+                            "duration": r.duration,
+                            "sent_bytes": r.sent_bytes,
+                            "sent_bps": r.sent_bps,
+                            "received_bytes": r.received_bytes,
+                            "received_bps": r.received_bps,
+                            "retransmits": r.retransmits,
+                            "jitter_ms": r.jitter_ms,
+                            "lost_packets": r.lost_packets,
+                            "lost_percent": r.lost_percent,
+                            "success": r.success,
+                            "error": r.error,
+                        }
+                    )
             click.echo(json_module.dumps(json_results, indent=2))
         else:
             click.echo("\n" + "=" * 60)
@@ -1421,7 +1460,9 @@ def testing_validate(test_file: str) -> None:
 
 @testing.command("show")
 @click.argument("test_file", type=click.Path(exists=True))
-@click.option("--format", "-f", "output_format", type=click.Choice(["yaml", "json"]), default="yaml")
+@click.option(
+    "--format", "-f", "output_format", type=click.Choice(["yaml", "json"]), default="yaml"
+)
 def testing_show(test_file: str, output_format: str) -> None:
     """Show resolved test configuration.
 

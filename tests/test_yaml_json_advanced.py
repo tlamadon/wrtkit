@@ -31,10 +31,12 @@ def test_empty_config_serialization():
 
 def test_list_fields_serialization():
     """Test that list fields are properly serialized."""
-    device = NetworkDevice("br_lan") \
-        .with_name("br-lan") \
-        .with_type("bridge") \
+    device = (
+        NetworkDevice("br_lan")
+        .with_name("br-lan")
+        .with_type("bridge")
         .with_ports(["lan1", "lan2", "lan3", "lan4"])
+    )
 
     yaml_str = device.to_yaml()
 
@@ -52,9 +54,7 @@ def test_list_fields_serialization():
 
 def test_boolean_serialization():
     """Test that boolean values are serialized correctly."""
-    radio = WirelessRadio("radio0") \
-        .with_channel(36) \
-        .with_disabled(False)
+    radio = WirelessRadio("radio0").with_channel(36).with_disabled(False)
 
     # To YAML
     yaml_str = radio.to_yaml()
@@ -72,13 +72,9 @@ def test_boolean_serialization():
 
 def test_integer_serialization():
     """Test that integer values are properly handled."""
-    radio = WirelessRadio("radio0") \
-        .with_channel(36) \
-        .with_txpower(20)
+    radio = WirelessRadio("radio0").with_channel(36).with_txpower(20)
 
-    dhcp = DHCPSection("lan") \
-        .with_start(100) \
-        .with_limit(150)
+    dhcp = DHCPSection("lan").with_start(100).with_limit(150)
 
     # Check types are preserved
     radio_json = json.loads(radio.to_json())
@@ -92,10 +88,12 @@ def test_integer_serialization():
 
 def test_special_characters_in_strings():
     """Test handling of special characters in string values."""
-    interface = WirelessInterface("test") \
-        .with_device("radio0") \
-        .with_ssid("Test Network with 'quotes' and \"double quotes\"") \
+    interface = (
+        WirelessInterface("test")
+        .with_device("radio0")
+        .with_ssid("Test Network with 'quotes' and \"double quotes\"")
         .with_key("Password!@#$%^&*()")
+    )
 
     # Serialize to YAML
     yaml_str = interface.to_yaml()
@@ -108,9 +106,7 @@ def test_special_characters_in_strings():
 
 def test_unicode_characters():
     """Test handling of unicode characters."""
-    interface = WirelessInterface("test") \
-        .with_device("radio0") \
-        .with_ssid("Tëst Nétwork 网络 🚀")
+    interface = WirelessInterface("test").with_device("radio0").with_ssid("Tëst Nétwork 网络 🚀")
 
     yaml_str = interface.to_yaml()
     json_str = interface.to_json()
@@ -125,9 +121,7 @@ def test_unicode_characters():
 
 def test_nested_list_in_firewall():
     """Test that nested lists in firewall zones work correctly."""
-    zone = FirewallZone(0) \
-        .with_name("lan") \
-        .with_networks(["lan", "guest", "iot"])
+    zone = FirewallZone(0).with_name("lan").with_networks(["lan", "guest", "iot"])
 
     config = UCIConfig()
     config.firewall.add_zone(zone)
@@ -153,9 +147,7 @@ def test_multiple_sections_same_type():
 
     # Add multiple interfaces
     for i in range(5):
-        interface = NetworkInterface(f"eth{i}") \
-            .with_device(f"eth{i}") \
-            .with_proto("dhcp")
+        interface = NetworkInterface(f"eth{i}").with_device(f"eth{i}").with_proto("dhcp")
         config.network.add_interface(interface)
 
     # Serialize
@@ -174,10 +166,9 @@ def test_hybrid_workflow():
     """Test combining YAML loading with programmatic additions."""
     # Create base config
     base_config = UCIConfig()
-    device = NetworkDevice("br_lan") \
-        .with_name("br-lan") \
-        .with_type("bridge") \
-        .with_ports(["lan1", "lan2"])
+    device = (
+        NetworkDevice("br_lan").with_name("br-lan").with_type("bridge").with_ports(["lan1", "lan2"])
+    )
     base_config.network.add_device(device)
 
     # Save to file
@@ -190,9 +181,11 @@ def test_hybrid_workflow():
 
         # Add more interfaces
         for vlan_id in [10, 20, 30]:
-            interface = NetworkInterface(f"vlan{vlan_id}") \
-                .with_device(f"lan1.{vlan_id}") \
+            interface = (
+                NetworkInterface(f"vlan{vlan_id}")
+                .with_device(f"lan1.{vlan_id}")
                 .with_static_ip(f"192.168.{vlan_id}.1", "255.255.255.0")
+            )
             loaded_config.network.add_interface(interface)
 
         # Verify
@@ -212,16 +205,14 @@ def test_partial_config_merge():
     """Test merging partial configurations."""
     # Network config
     network_config = UCIConfig()
-    lan = NetworkInterface("lan") \
-        .with_device("br-lan") \
-        .with_static_ip("192.168.1.1", "255.255.255.0")
+    lan = (
+        NetworkInterface("lan").with_device("br-lan").with_static_ip("192.168.1.1", "255.255.255.0")
+    )
     network_config.network.add_interface(lan)
 
     # Wireless config
     wireless_config = UCIConfig()
-    radio = WirelessRadio("radio0") \
-        .with_channel(36) \
-        .with_htmode("HE80")
+    radio = WirelessRadio("radio0").with_channel(36).with_htmode("HE80")
     wireless_config.wireless.add_radio(radio)
 
     # Save separately
@@ -285,17 +276,17 @@ def test_large_configuration():
 
     # Add many network interfaces
     for i in range(50):
-        interface = NetworkInterface(f"iface{i}") \
-            .with_device(f"eth{i}") \
-            .with_proto("dhcp")
+        interface = NetworkInterface(f"iface{i}").with_device(f"eth{i}").with_proto("dhcp")
         config.network.add_interface(interface)
 
     # Add many wireless interfaces
     for i in range(50):
-        iface = WirelessInterface(f"wl{i}") \
-            .with_device(f"radio{i % 2}") \
-            .with_mode("ap") \
+        iface = (
+            WirelessInterface(f"wl{i}")
+            .with_device(f"radio{i % 2}")
+            .with_mode("ap")
             .with_ssid(f"Network{i}")
+        )
         config.wireless.add_interface(iface)
 
     # Serialize and deserialize
@@ -331,20 +322,17 @@ def test_to_dict_with_complex_nesting():
     config = UCIConfig()
 
     # Add complex configuration
-    device = NetworkDevice("br_lan") \
-        .with_name("br-lan") \
-        .with_type("bridge") \
-        .with_ports(["lan1", "lan2"])
+    device = (
+        NetworkDevice("br_lan").with_name("br-lan").with_type("bridge").with_ports(["lan1", "lan2"])
+    )
     config.network.add_device(device)
 
-    interface = NetworkInterface("lan") \
-        .with_device("br-lan") \
-        .with_static_ip("192.168.1.1", "255.255.255.0")
+    interface = (
+        NetworkInterface("lan").with_device("br-lan").with_static_ip("192.168.1.1", "255.255.255.0")
+    )
     config.network.add_interface(interface)
 
-    zone = FirewallZone(0) \
-        .with_name("lan") \
-        .with_networks(["lan", "guest"])
+    zone = FirewallZone(0).with_name("lan").with_networks(["lan", "guest"])
     config.firewall.add_zone(zone)
 
     # Get dict
@@ -366,20 +354,18 @@ def test_individual_section_file_operations():
     """Test saving and loading individual sections to files."""
     with tempfile.TemporaryDirectory() as tmpdir:
         # Create and save different section types
-        interface = NetworkInterface("lan") \
-            .with_device("br-lan") \
+        interface = (
+            NetworkInterface("lan")
+            .with_device("br-lan")
             .with_static_ip("192.168.1.1", "255.255.255.0")
+        )
         interface.to_yaml_file(f"{tmpdir}/interface.yaml")
         interface.to_json_file(f"{tmpdir}/interface.json")
 
-        radio = WirelessRadio("radio0") \
-            .with_channel(36) \
-            .with_htmode("HE80")
+        radio = WirelessRadio("radio0").with_channel(36).with_htmode("HE80")
         radio.to_yaml_file(f"{tmpdir}/radio.yaml")
 
-        dhcp = DHCPSection("lan") \
-            .with_interface("lan") \
-            .with_range(100, 150, "12h")
+        dhcp = DHCPSection("lan").with_interface("lan").with_range(100, 150, "12h")
         dhcp.to_json_file(f"{tmpdir}/dhcp.json")
 
         # Load them back
@@ -400,20 +386,17 @@ def test_config_equality_after_roundtrip():
     original = UCIConfig()
 
     # Build a complete config
-    device = NetworkDevice("br_lan") \
-        .with_name("br-lan") \
-        .with_type("bridge") \
-        .with_ports(["lan1", "lan2"])
+    device = (
+        NetworkDevice("br_lan").with_name("br-lan").with_type("bridge").with_ports(["lan1", "lan2"])
+    )
     original.network.add_device(device)
 
-    interface = NetworkInterface("lan") \
-        .with_device("br-lan") \
-        .with_static_ip("192.168.1.1", "255.255.255.0")
+    interface = (
+        NetworkInterface("lan").with_device("br-lan").with_static_ip("192.168.1.1", "255.255.255.0")
+    )
     original.network.add_interface(interface)
 
-    radio = WirelessRadio("radio0") \
-        .with_channel(36) \
-        .with_htmode("HE80")
+    radio = WirelessRadio("radio0").with_channel(36).with_htmode("HE80")
     original.wireless.add_radio(radio)
 
     # Get UCI commands from original

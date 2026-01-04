@@ -12,7 +12,9 @@ def test_config_to_script():
 
     config = UCIConfig()
 
-    lan = NetworkInterface("lan").with_device("eth0").with_proto("static").with_ipaddr("192.168.1.1")
+    lan = (
+        NetworkInterface("lan").with_device("eth0").with_proto("static").with_ipaddr("192.168.1.1")
+    )
     config.network.add_interface(lan)
 
     radio = WirelessRadio("radio0").with_channel(11).with_htmode("HT20")
@@ -308,9 +310,8 @@ network.guest.proto='static'"""
     config = UCIConfig()
     # Add some local config that matches remote
     from wrtkit.network import NetworkInterface
-    lan = NetworkInterface("lan")\
-        .with_ipaddr("192.168.1.1")\
-        .with_netmask("255.255.255.0")
+
+    lan = NetworkInterface("lan").with_ipaddr("192.168.1.1").with_netmask("255.255.255.0")
     config.network.add_interface(lan)
 
     # Add some local config that differs from remote
@@ -355,11 +356,14 @@ def test_config_diff_list_items():
     config = UCIConfig()
     # Add local config with some overlapping and some different list items
     from wrtkit.network import NetworkDevice
-    device = NetworkDevice("br_lan")\
-        .with_name("br-lan")\
-        .with_type("bridge")\
-        .with_port("lan1")\
+
+    device = (
+        NetworkDevice("br_lan")
+        .with_name("br-lan")
+        .with_type("bridge")
+        .with_port("lan1")
         .with_port("bat0.10")
+    )
     config.network.add_device(device)
 
     # Get diff
@@ -370,7 +374,9 @@ def test_config_diff_list_items():
 
     # Find the add_list commands
     to_add_ports = [cmd for cmd in diff.to_add if cmd.action == "add_list" and "ports" in cmd.path]
-    remote_only_ports = [cmd for cmd in diff.remote_only if cmd.action == "add_list" and "ports" in cmd.path]
+    remote_only_ports = [
+        cmd for cmd in diff.remote_only if cmd.action == "add_list" and "ports" in cmd.path
+    ]
     common_ports = [cmd for cmd in diff.common if cmd.action == "add_list" and "ports" in cmd.path]
 
     # Verify list items
@@ -531,6 +537,7 @@ network.guest.proto='dhcp'"""
 
     config = UCIConfig()
     from wrtkit.network import NetworkInterface
+
     lan = NetworkInterface("lan").with_ipaddr("192.168.1.1")
     config.network.add_interface(lan)
 
@@ -675,6 +682,7 @@ dhcp.guest.interface='guest'"""
 
 
 # Tests for RemotePolicy functionality
+
 
 def test_remote_policy_basic():
     """Test basic RemotePolicy functionality."""
@@ -876,21 +884,22 @@ def test_remote_policy_diff_with_list_values():
     # No local device - remote_device is remote-only
 
     # Set remote policy: allow remote_device section, but only lan* port values
-    config.network.remote_policy = RemotePolicy(
-        allowed_sections=["*"],
-        allowed_values=["lan*"]
-    )
+    config.network.remote_policy = RemotePolicy(allowed_sections=["*"], allowed_values=["lan*"])
 
     # Get diff
     diff = config.diff(MockSSH(), show_remote_only=True)
 
     # lan1 and lan2 should be in remote_only (allowed by value pattern)
-    remote_ports = [cmd for cmd in diff.remote_only if cmd.action == "add_list" and "ports" in cmd.path]
+    remote_ports = [
+        cmd for cmd in diff.remote_only if cmd.action == "add_list" and "ports" in cmd.path
+    ]
     assert len(remote_ports) == 2
     assert set(cmd.value for cmd in remote_ports) == {"lan1", "lan2"}
 
     # bat0 and wlan0 should be in to_remove (not allowed by value pattern)
-    remove_ports = [cmd for cmd in diff.to_remove if cmd.action == "add_list" and "ports" in cmd.path]
+    remove_ports = [
+        cmd for cmd in diff.to_remove if cmd.action == "add_list" and "ports" in cmd.path
+    ]
     assert len(remove_ports) == 2
     assert set(cmd.value for cmd in remove_ports) == {"bat0", "wlan0"}
 
@@ -925,14 +934,16 @@ def test_remote_policy_list_values_in_local_section():
     # Even with allowed_values, remote list items not in local should be removed
     config.network.remote_policy = RemotePolicy(
         allowed_sections=["*"],
-        allowed_values=["lan*"]  # This doesn't protect locally-managed sections
+        allowed_values=["lan*"],  # This doesn't protect locally-managed sections
     )
 
     # Get diff
     diff = config.diff(MockSSH(), show_remote_only=True)
 
     # lan2 and bat0 should be in to_remove (not in local config)
-    remove_ports = [cmd for cmd in diff.to_remove if cmd.action == "add_list" and "ports" in cmd.path]
+    remove_ports = [
+        cmd for cmd in diff.to_remove if cmd.action == "add_list" and "ports" in cmd.path
+    ]
     assert len(remove_ports) == 2
     assert set(cmd.value for cmd in remove_ports) == {"lan2", "bat0"}
 

@@ -4,7 +4,7 @@ Example configuration that mirrors the router.cfg file.
 This demonstrates how to use wrtkit to define OpenWRT configuration in Python.
 """
 
-from wrtkit import UCIConfig, SSHConnection
+from wrtkit import UCIConfig
 
 
 def create_router_config() -> UCIConfig:
@@ -14,129 +14,75 @@ def create_router_config() -> UCIConfig:
     # =====================
     # LAN BRIDGE
     # =====================
-    config.network.device("br_lan") \
-        .name("br-lan") \
-        .type("bridge") \
-        .add_port("lan1") \
-        .add_port("lan2") \
-        .add_port("lan3")
+    config.network.device("br_lan").name("br-lan").type("bridge").add_port("lan1").add_port(
+        "lan2"
+    ).add_port("lan3")
 
-    config.network.interface("lan") \
-        .device("br-lan") \
-        .proto("static") \
-        .ipaddr("192.168.10.1") \
-        .netmask("255.255.255.0")
+    config.network.interface("lan").device("br-lan").proto("static").ipaddr("192.168.10.1").netmask(
+        "255.255.255.0"
+    )
 
     # =====================
     # WAN
     # =====================
-    config.network.interface("wan") \
-        .device("eth1") \
-        .proto("dhcp")
+    config.network.interface("wan").device("eth1").proto("dhcp")
 
     # =====================
     # DHCP
     # =====================
-    config.dhcp.dhcp("lan") \
-        .interface("lan") \
-        .start(100) \
-        .limit(150) \
-        .leasetime("12h") \
-        .ignore(False)
+    config.dhcp.dhcp("lan").interface("lan").start(100).limit(150).leasetime("12h").ignore(False)
 
     # =====================
     # FIREWALL
     # =====================
-    config.firewall.zone(0) \
-        .name("lan") \
-        .input("ACCEPT") \
-        .output("ACCEPT") \
-        .forward("ACCEPT") \
-        .add_network("lan")
+    config.firewall.zone(0).name("lan").input("ACCEPT").output("ACCEPT").forward(
+        "ACCEPT"
+    ).add_network("lan")
 
-    config.firewall.zone(1) \
-        .name("wan") \
-        .input("REJECT") \
-        .output("ACCEPT") \
-        .forward("REJECT") \
-        .masq(True) \
-        .mtu_fix(True) \
-        .add_network("wan")
+    config.firewall.zone(1).name("wan").input("REJECT").output("ACCEPT").forward("REJECT").masq(
+        True
+    ).mtu_fix(True).add_network("wan")
 
-    config.firewall.forwarding(0) \
-        .src("lan") \
-        .dest("wan")
+    config.firewall.forwarding(0).src("lan").dest("wan")
 
     # =====================
     # BATMAN-ADV
     # =====================
-    config.network.interface("bat0") \
-        .proto("batadv") \
-        .routing_algo("BATMAN_IV") \
-        .gw_mode("server") \
-        .gw_bandwidth("10000/10000") \
-        .hop_penalty(30) \
-        .orig_interval(1000)
+    config.network.interface("bat0").proto("batadv").routing_algo("BATMAN_IV").gw_mode(
+        "server"
+    ).gw_bandwidth("10000/10000").hop_penalty(30).orig_interval(1000)
 
-    config.network.device("bat0_vlan10") \
-        .type("8021q") \
-        .ifname("bat0") \
-        .vid(10) \
-        .name("bat0.10")
+    config.network.device("bat0_vlan10").type("8021q").ifname("bat0").vid(10).name("bat0.10")
 
     # Add bat0.10 to the bridge (note: this would need to be added to the existing br_lan)
     # In practice, you might need to handle this differently depending on your use case
 
-    config.network.interface("mesh0") \
-        .proto("batadv_hardif") \
-        .master("bat0")
+    config.network.interface("mesh0").proto("batadv_hardif").master("bat0")
 
     # =====================
     # WIRELESS
     # =====================
-    config.wireless.radio("radio0") \
-        .channel(11) \
-        .htmode("HT20") \
-        .country("US") \
-        .disabled(False)
+    config.wireless.radio("radio0").channel(11).htmode("HT20").country("US").disabled(False)
 
-    config.wireless.radio("radio1") \
-        .channel(149) \
-        .country("US") \
-        .disabled(False)
+    config.wireless.radio("radio1").channel(149).country("US").disabled(False)
 
-    config.wireless.wifi_iface("ap_two") \
-        .device("radio0") \
-        .mode("ap") \
-        .network("lan") \
-        .ssid("MyNetwork-2G") \
-        .encryption("psk2") \
-        .key("YourSecurePassword123") \
-        .ieee80211r(True) \
-        .ft_over_ds(True) \
-        .ft_psk_generate_local(True)
+    config.wireless.wifi_iface("ap_two").device("radio0").mode("ap").network("lan").ssid(
+        "MyNetwork-2G"
+    ).encryption("psk2").key("YourSecurePassword123").ieee80211r(True).ft_over_ds(
+        True
+    ).ft_psk_generate_local(True)
 
-    config.wireless.wifi_iface("ap_five") \
-        .device("radio1") \
-        .mode("ap") \
-        .network("lan") \
-        .ssid("MyNetwork-5G") \
-        .encryption("psk2") \
-        .key("YourSecurePassword123") \
-        .ieee80211r(True) \
-        .ft_over_ds(True) \
-        .ft_psk_generate_local(True)
+    config.wireless.wifi_iface("ap_five").device("radio1").mode("ap").network("lan").ssid(
+        "MyNetwork-5G"
+    ).encryption("psk2").key("YourSecurePassword123").ieee80211r(True).ft_over_ds(
+        True
+    ).ft_psk_generate_local(True)
 
-    config.wireless.wifi_iface("mesh0_iface") \
-        .device("radio1") \
-        .mode("mesh") \
-        .ifname("mesh0") \
-        .network("mesh0") \
-        .mesh_id("MyMeshNetwork") \
-        .encryption("sae") \
-        .key("MeshPassword123") \
-        .mesh_fwding(False) \
-        .mcast_rate(18000)
+    config.wireless.wifi_iface("mesh0_iface").device("radio1").mode("mesh").ifname("mesh0").network(
+        "mesh0"
+    ).mesh_id("MyMeshNetwork").encryption("sae").key("MeshPassword123").mesh_fwding(
+        False
+    ).mcast_rate(18000)
 
     return config
 

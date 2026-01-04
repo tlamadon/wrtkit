@@ -11,7 +11,12 @@ from wrtkit import UCIConfig, NetworkInterface, RemotePolicy
 config = UCIConfig()
 
 # Define only the LAN interface in local config
-lan = NetworkInterface("lan").with_proto("static").with_ipaddr("192.168.1.1").with_netmask("255.255.255.0")
+lan = (
+    NetworkInterface("lan")
+    .with_proto("static")
+    .with_ipaddr("192.168.1.1")
+    .with_netmask("255.255.255.0")
+)
 config.network.add_interface(lan)
 
 # Configure remote policy with whitelist patterns
@@ -19,9 +24,9 @@ config.network.add_interface(lan)
 config.network.remote_policy = RemotePolicy(
     whitelist=[
         "interfaces.*.gateway",  # Keep gateway setting on all interfaces
-        "interfaces.guest.*",    # Keep entire guest interface (all options)
-        "interfaces.vpn.*",      # Keep entire vpn interface (all options)
-        "devices.*.ports",       # Keep all ports on all devices
+        "interfaces.guest.*",  # Keep entire guest interface (all options)
+        "interfaces.vpn.*",  # Keep entire vpn interface (all options)
+        "devices.*.ports",  # Keep all ports on all devices
     ]
 )
 

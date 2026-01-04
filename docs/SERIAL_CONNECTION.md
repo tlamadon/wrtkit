@@ -32,11 +32,11 @@ with SerialConnection(port="/dev/ttyUSB0", baudrate=115200) as serial:
 
 ## Features
 
-✅ **Same Interface as SSH** - SerialConnection implements the same methods as SSHConnection  
-✅ **Auto-login Support** - Handles login prompts automatically if credentials provided  
-✅ **Prompt Detection** - Configurable regex for shell prompt detection  
-✅ **Exit Code Support** - Captures command exit codes via `echo $?`  
-✅ **Context Manager** - Use with `with` statement for automatic cleanup  
+✅ **Same Interface as SSH** - SerialConnection implements the same methods as SSHConnection
+✅ **Auto-login Support** - Handles login prompts automatically if credentials provided
+✅ **Prompt Detection** - Configurable regex for shell prompt detection
+✅ **Exit Code Support** - Captures command exit codes via `echo $?`
+✅ **Context Manager** - Use with `with` statement for automatic cleanup
 ✅ **Cross-platform** - Works on Linux, macOS, and Windows
 
 ## Connection Parameters

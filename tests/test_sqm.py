@@ -7,13 +7,15 @@ from wrtkit.base import UCICommand
 def test_sqm_basic_configuration():
     """Test configuring a basic SQM queue."""
     sqm = SQMConfig()
-    queue = SQMQueue("wan")\
-        .with_interface("eth0")\
-        .with_download(50000)\
-        .with_upload(10000)\
-        .with_qdisc("cake")\
-        .with_script("piece_of_cake.qos")\
+    queue = (
+        SQMQueue("wan")
+        .with_interface("eth0")
+        .with_download(50000)
+        .with_upload(10000)
+        .with_qdisc("cake")
+        .with_script("piece_of_cake.qos")
         .with_enabled(True)
+    )
     sqm.add_queue(queue)
 
     commands = sqm.get_commands()
@@ -24,16 +26,16 @@ def test_sqm_basic_configuration():
     assert any(cmd.path == "sqm.wan.download" and cmd.value == "50000" for cmd in commands)
     assert any(cmd.path == "sqm.wan.upload" and cmd.value == "10000" for cmd in commands)
     assert any(cmd.path == "sqm.wan.qdisc" and cmd.value == "cake" for cmd in commands)
-    assert any(cmd.path == "sqm.wan.script" and cmd.value == "piece_of_cake.qos" for cmd in commands)
+    assert any(
+        cmd.path == "sqm.wan.script" and cmd.value == "piece_of_cake.qos" for cmd in commands
+    )
     assert any(cmd.path == "sqm.wan.enabled" and cmd.value == "1" for cmd in commands)
 
 
 def test_sqm_disabled():
     """Test disabling an SQM queue."""
     sqm = SQMConfig()
-    queue = SQMQueue("wan")\
-        .with_interface("eth0")\
-        .with_enabled(False)
+    queue = SQMQueue("wan").with_interface("eth0").with_enabled(False)
     sqm.add_queue(queue)
 
     commands = sqm.get_commands()
@@ -43,10 +45,7 @@ def test_sqm_disabled():
 
 def test_sqm_with_cake():
     """Test the CAKE convenience method."""
-    queue = SQMQueue("wan")\
-        .with_interface("eth0")\
-        .with_cake(100000, 20000)\
-        .with_enabled(True)
+    queue = SQMQueue("wan").with_interface("eth0").with_cake(100000, 20000).with_enabled(True)
 
     sqm = SQMConfig()
     sqm.add_queue(queue)
@@ -54,17 +53,16 @@ def test_sqm_with_cake():
     commands = sqm.get_commands()
 
     assert any(cmd.path == "sqm.wan.qdisc" and cmd.value == "cake" for cmd in commands)
-    assert any(cmd.path == "sqm.wan.script" and cmd.value == "piece_of_cake.qos" for cmd in commands)
+    assert any(
+        cmd.path == "sqm.wan.script" and cmd.value == "piece_of_cake.qos" for cmd in commands
+    )
     assert any(cmd.path == "sqm.wan.download" and cmd.value == "100000" for cmd in commands)
     assert any(cmd.path == "sqm.wan.upload" and cmd.value == "20000" for cmd in commands)
 
 
 def test_sqm_with_fq_codel():
     """Test the fq_codel convenience method."""
-    queue = SQMQueue("wan")\
-        .with_interface("eth0")\
-        .with_fq_codel(50000, 10000)\
-        .with_enabled(True)
+    queue = SQMQueue("wan").with_interface("eth0").with_fq_codel(50000, 10000).with_enabled(True)
 
     sqm = SQMConfig()
     sqm.add_queue(queue)
@@ -79,11 +77,13 @@ def test_sqm_with_fq_codel():
 
 def test_sqm_with_link_layer():
     """Test link layer configuration."""
-    queue = SQMQueue("wan")\
-        .with_interface("eth0")\
-        .with_cake(100000, 20000)\
-        .with_link_layer("ethernet", 34)\
+    queue = (
+        SQMQueue("wan")
+        .with_interface("eth0")
+        .with_cake(100000, 20000)
+        .with_link_layer("ethernet", 34)
         .with_enabled(True)
+    )
 
     sqm = SQMConfig()
     sqm.add_queue(queue)
@@ -98,15 +98,11 @@ def test_sqm_multiple_queues():
     """Test configuring multiple SQM queues."""
     sqm = SQMConfig()
 
-    wan_queue = SQMQueue("wan")\
-        .with_interface("eth0")\
-        .with_cake(100000, 20000)\
-        .with_enabled(True)
+    wan_queue = SQMQueue("wan").with_interface("eth0").with_cake(100000, 20000).with_enabled(True)
 
-    guest_queue = SQMQueue("guest")\
-        .with_interface("eth1")\
-        .with_fq_codel(25000, 5000)\
-        .with_enabled(True)
+    guest_queue = (
+        SQMQueue("guest").with_interface("eth1").with_fq_codel(25000, 5000).with_enabled(True)
+    )
 
     sqm.add_queue(wan_queue)
     sqm.add_queue(guest_queue)
@@ -124,12 +120,14 @@ def test_sqm_multiple_queues():
 
 def test_sqm_ecn_settings():
     """Test ECN configuration."""
-    queue = SQMQueue("wan")\
-        .with_interface("eth0")\
-        .with_cake(100000, 20000)\
-        .with_ingress_ecn("ECN")\
-        .with_egress_ecn("NOECN")\
+    queue = (
+        SQMQueue("wan")
+        .with_interface("eth0")
+        .with_cake(100000, 20000)
+        .with_ingress_ecn("ECN")
+        .with_egress_ecn("NOECN")
         .with_enabled(True)
+    )
 
     sqm = SQMConfig()
     sqm.add_queue(queue)
@@ -142,12 +140,14 @@ def test_sqm_ecn_settings():
 
 def test_sqm_with_speeds():
     """Test the with_speeds convenience method."""
-    queue = SQMQueue("wan")\
-        .with_interface("eth0")\
-        .with_speeds(100000, 20000)\
-        .with_qdisc("cake")\
-        .with_script("piece_of_cake.qos")\
+    queue = (
+        SQMQueue("wan")
+        .with_interface("eth0")
+        .with_speeds(100000, 20000)
+        .with_qdisc("cake")
+        .with_script("piece_of_cake.qos")
         .with_enabled(True)
+    )
 
     sqm = SQMConfig()
     sqm.add_queue(queue)

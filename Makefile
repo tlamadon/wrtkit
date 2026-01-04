@@ -148,13 +148,20 @@ test-fast: ## Run tests quickly (no output)
 	@pytest tests/ -q
 
 typecheck: ## Run type checking
-	@mypy src/texer
+	@mypy src/wrtkit
 
 lint: ## Run linting
-	@ruff check src/ tests/
+	@ruff check src/wrtkit
 
 format: ## Format code
-	@ruff format src/ tests/
+	@ruff format src/wrtkit
+
+pre-commit: ## Run pre-commit hooks on all files
+	@pre-commit run --all-files
+
+pre-commit-install: ## Install pre-commit hooks
+	@pre-commit install
+	@echo "$(GREEN)✓$(NC) Pre-commit hooks installed"
 
 clean: ## Clean build artifacts
 	@rm -rf build/ dist/ *.egg-info
@@ -171,5 +178,5 @@ docs-serve: ## Serve documentation locally
 	@mkdocs serve
 
 # Pre-release checks (can be run manually before releasing)
-check: test typecheck ## Run all checks (tests + typecheck)
+check: typecheck lint test ## Run all checks (typecheck + lint + tests)
 	@echo "$(GREEN)✓ All checks passed!$(NC)"

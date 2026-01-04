@@ -15,9 +15,7 @@ class FleetDefaults(BaseModel):
 
     timeout: int = Field(default=30, description="Connection timeout in seconds")
     username: str = Field(default="root", description="Default SSH username")
-    commit_delay: int = Field(
-        default=10, description="Seconds to wait before coordinated commit"
-    )
+    commit_delay: int = Field(default=10, description="Seconds to wait before coordinated commit")
 
 
 class FleetDevice(BaseModel):
@@ -102,7 +100,9 @@ def merge_device_configs(
 
     for config_path in device.configs:
         # Resolve relative paths from fleet file location
-        full_path = base_dir / config_path if not Path(config_path).is_absolute() else Path(config_path)
+        full_path = (
+            base_dir / config_path if not Path(config_path).is_absolute() else Path(config_path)
+        )
 
         if not full_path.exists():
             raise FileNotFoundError(f"Config file not found: {full_path}")

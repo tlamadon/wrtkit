@@ -7,12 +7,14 @@ from wrtkit.base import UCICommand
 def test_dhcp_configuration():
     """Test configuring a DHCP server."""
     dhcp = DHCPConfig()
-    section = DHCPSection("lan")\
-        .with_interface("lan")\
-        .with_start(100)\
-        .with_limit(150)\
-        .with_leasetime("12h")\
+    section = (
+        DHCPSection("lan")
+        .with_interface("lan")
+        .with_start(100)
+        .with_limit(150)
+        .with_leasetime("12h")
         .with_ignore(False)
+    )
     dhcp.add_dhcp(section)
 
     commands = dhcp.get_commands()
@@ -29,9 +31,7 @@ def test_dhcp_configuration():
 def test_dhcp_disabled():
     """Test disabling a DHCP server."""
     dhcp = DHCPConfig()
-    section = DHCPSection("guest")\
-        .with_interface("guest")\
-        .with_ignore(True)
+    section = DHCPSection("guest").with_interface("guest").with_ignore(True)
     dhcp.add_dhcp(section)
 
     commands = dhcp.get_commands()
@@ -42,27 +42,33 @@ def test_dhcp_disabled():
 def test_dhcp_host_static_lease():
     """Test configuring a DHCP static lease (host)."""
     dhcp = DHCPConfig()
-    host = DHCPHost("printer")\
-        .with_mac("aa:bb:cc:dd:ee:ff")\
-        .with_ip("192.168.1.50")\
+    host = (
+        DHCPHost("printer")
+        .with_mac("aa:bb:cc:dd:ee:ff")
+        .with_ip("192.168.1.50")
         .with_name("printer")
+    )
     dhcp.add_host(host)
 
     commands = dhcp.get_commands()
     assert len(commands) == 4
 
     assert commands[0] == UCICommand("set", "dhcp.printer", "host")
-    assert any(cmd.path == "dhcp.printer.mac" and cmd.value == "aa:bb:cc:dd:ee:ff" for cmd in commands)
+    assert any(
+        cmd.path == "dhcp.printer.mac" and cmd.value == "aa:bb:cc:dd:ee:ff" for cmd in commands
+    )
     assert any(cmd.path == "dhcp.printer.ip" and cmd.value == "192.168.1.50" for cmd in commands)
     assert any(cmd.path == "dhcp.printer.name" and cmd.value == "printer" for cmd in commands)
 
 
 def test_dhcp_host_with_leasetime():
     """Test static lease with custom lease time."""
-    host = DHCPHost("nas")\
-        .with_mac("11:22:33:44:55:66")\
-        .with_ip("192.168.1.100")\
+    host = (
+        DHCPHost("nas")
+        .with_mac("11:22:33:44:55:66")
+        .with_ip("192.168.1.100")
         .with_leasetime("infinite")
+    )
 
     commands = host.get_commands()
 
@@ -73,9 +79,7 @@ def test_dhcp_host_with_leasetime():
 def test_dhcp_host_convenience_builder():
     """Test the with_static_lease convenience method."""
     host = DHCPHost("device").with_static_lease(
-        mac="aa:bb:cc:dd:ee:ff",
-        ip="192.168.1.200",
-        name="mydevice"
+        mac="aa:bb:cc:dd:ee:ff", ip="192.168.1.200", name="mydevice"
     )
 
     assert host.mac == "aa:bb:cc:dd:ee:ff"
@@ -88,10 +92,7 @@ def test_dhcp_config_with_sections_and_hosts():
     dhcp = DHCPConfig()
 
     # Add DHCP server section
-    section = DHCPSection("lan")\
-        .with_interface("lan")\
-        .with_start(100)\
-        .with_limit(150)
+    section = DHCPSection("lan").with_interface("lan").with_start(100).with_limit(150)
     dhcp.add_dhcp(section)
 
     # Add static hosts
@@ -113,18 +114,19 @@ def test_dhcp_host_field_aliases():
     # Create host with old field names (macaddr, ipaddr, hostname)
     # These should be aliased to the correct names (mac, ip, name)
     host = DHCPHost(
-        "monoprice",
-        macaddr="D4:AD:20:92:44:AA",
-        ipaddr="192.168.10.99",
-        hostname="monoprice-con"
+        "monoprice", macaddr="D4:AD:20:92:44:AA", ipaddr="192.168.10.99", hostname="monoprice-con"
     )
 
     commands = host.get_commands()
 
     # Should generate commands with CORRECT option names (mac, ip, name)
-    assert any(cmd.path == "dhcp.monoprice.mac" and cmd.value == "D4:AD:20:92:44:AA" for cmd in commands)
+    assert any(
+        cmd.path == "dhcp.monoprice.mac" and cmd.value == "D4:AD:20:92:44:AA" for cmd in commands
+    )
     assert any(cmd.path == "dhcp.monoprice.ip" and cmd.value == "192.168.10.99" for cmd in commands)
-    assert any(cmd.path == "dhcp.monoprice.name" and cmd.value == "monoprice-con" for cmd in commands)
+    assert any(
+        cmd.path == "dhcp.monoprice.name" and cmd.value == "monoprice-con" for cmd in commands
+    )
 
     # Should NOT generate commands with wrong option names
     assert not any(cmd.path == "dhcp.monoprice.macaddr" for cmd in commands)

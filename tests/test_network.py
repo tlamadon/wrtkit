@@ -7,11 +7,13 @@ from wrtkit.base import UCICommand
 def test_device_creation():
     """Test creating a network device."""
     net = NetworkConfig()
-    device = NetworkDevice("br_lan")\
-        .with_name("br-lan")\
-        .with_type("bridge")\
-        .with_port("lan1")\
+    device = (
+        NetworkDevice("br_lan")
+        .with_name("br-lan")
+        .with_type("bridge")
+        .with_port("lan1")
         .with_port("lan2")
+    )
 
     net.add_device(device)
 
@@ -26,11 +28,13 @@ def test_device_creation():
 def test_interface_creation():
     """Test creating a network interface."""
     net = NetworkConfig()
-    interface = NetworkInterface("lan")\
-        .with_device("br-lan")\
-        .with_proto("static")\
-        .with_ipaddr("192.168.1.1")\
+    interface = (
+        NetworkInterface("lan")
+        .with_device("br-lan")
+        .with_proto("static")
+        .with_ipaddr("192.168.1.1")
         .with_netmask("255.255.255.0")
+    )
 
     net.add_interface(interface)
 
@@ -47,19 +51,23 @@ def test_interface_creation():
 def test_batadv_interface():
     """Test creating a batman-adv interface."""
     net = NetworkConfig()
-    interface = NetworkInterface("bat0")\
-        .with_proto("batadv")\
-        .with_routing_algo("BATMAN_IV")\
-        .with_gw_mode("server")\
-        .with_gw_bandwidth("10000/10000")\
-        .with_hop_penalty(30)\
+    interface = (
+        NetworkInterface("bat0")
+        .with_proto("batadv")
+        .with_routing_algo("BATMAN_IV")
+        .with_gw_mode("server")
+        .with_gw_bandwidth("10000/10000")
+        .with_hop_penalty(30)
         .with_orig_interval(1000)
+    )
 
     net.add_interface(interface)
 
     commands = net.get_commands()
 
-    assert any(cmd.path == "network.bat0.routing_algo" and cmd.value == "BATMAN_IV" for cmd in commands)
+    assert any(
+        cmd.path == "network.bat0.routing_algo" and cmd.value == "BATMAN_IV" for cmd in commands
+    )
     assert any(cmd.path == "network.bat0.gw_mode" and cmd.value == "server" for cmd in commands)
     assert any(cmd.path == "network.bat0.hop_penalty" and cmd.value == "30" for cmd in commands)
 
@@ -67,11 +75,13 @@ def test_batadv_interface():
 def test_vlan_device():
     """Test creating a VLAN device."""
     net = NetworkConfig()
-    device = NetworkDevice("bat0_vlan10")\
-        .with_type("8021q")\
-        .with_ifname("bat0")\
-        .with_vid(10)\
+    device = (
+        NetworkDevice("bat0_vlan10")
+        .with_type("8021q")
+        .with_ifname("bat0")
+        .with_vid(10)
         .with_name("bat0.10")
+    )
 
     net.add_device(device)
 

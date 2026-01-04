@@ -15,9 +15,7 @@ class PingTest(BaseModel):
     name: str = Field(..., description="Unique test name")
     type: Literal["ping"] = Field(..., description="Test type")
     source: str = Field(..., description="Source device name from fleet")
-    destination: str = Field(
-        ..., description="Destination device name from fleet, or IP/hostname"
-    )
+    destination: str = Field(..., description="Destination device name from fleet, or IP/hostname")
     count: int = Field(default=4, description="Number of ping requests")
     interval: float = Field(default=1.0, description="Seconds between pings")
     timeout: int = Field(default=5, description="Per-ping timeout in seconds")
@@ -205,9 +203,7 @@ def resolve_tests(
                     count=test.count,
                     interval=test.interval,
                     timeout=test.timeout,
-                    source_params=_get_device_connection_params(
-                        source_device, fleet.defaults
-                    ),
+                    source_params=_get_device_connection_params(source_device, fleet.defaults),
                 )
             )
 
@@ -239,12 +235,8 @@ def resolve_tests(
                     protocol=test.protocol,
                     bitrate=test.bitrate,
                     port=test.port,
-                    server_params=_get_device_connection_params(
-                        server_device, fleet.defaults
-                    ),
-                    client_params=_get_device_connection_params(
-                        client_device, fleet.defaults
-                    ),
+                    server_params=_get_device_connection_params(server_device, fleet.defaults),
+                    client_params=_get_device_connection_params(client_device, fleet.defaults),
                 )
             )
 

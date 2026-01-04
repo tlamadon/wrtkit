@@ -25,7 +25,10 @@
       "Bash(wrtkit commands:*)",
       "Bash(WRTKIT_PASSWORD=testpass123 wrtkit preview:*)",
       "Bash(wrtkit import --help:*)",
-      "Bash(python3:*)"
+      "Bash(python3:*)",
+      "Bash(pre-commit install:*)",
+      "Bash(pre-commit run:*)",
+      "Bash(make check:*)"
     ]
   }
 }

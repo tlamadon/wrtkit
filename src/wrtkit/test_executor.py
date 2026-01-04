@@ -321,7 +321,9 @@ class TestExecutor:
             time.sleep(1.5)
 
             # Verify server is running
-            stdout, stderr, exit_code = server_conn.execute(f"cat /tmp/iperf3_{test.port}.pid 2>/dev/null")
+            stdout, stderr, exit_code = server_conn.execute(
+                f"cat /tmp/iperf3_{test.port}.pid 2>/dev/null"
+            )
             if exit_code != 0:
                 raise RuntimeError("iperf server failed to start (no PID file)")
 
@@ -387,7 +389,9 @@ class TestExecutor:
             if server_conn and server_started:
                 self._status("Stopping iperf server...")
                 try:
-                    server_conn.execute(f"kill $(cat /tmp/iperf3_{test.port}.pid 2>/dev/null) 2>/dev/null || true")
+                    server_conn.execute(
+                        f"kill $(cat /tmp/iperf3_{test.port}.pid 2>/dev/null) 2>/dev/null || true"
+                    )
                     server_conn.execute(f"rm -f /tmp/iperf3_{test.port}.pid")
                 except Exception:
                     pass
@@ -512,7 +516,9 @@ def format_iperf_result(result: IperfResult, use_color: bool = True) -> str:
                 return f"{b} B"
 
         lines.append(f"  Sent: {format_bytes(result.sent_bytes)} @ {format_bps(result.sent_bps)}")
-        lines.append(f"  Received: {format_bytes(result.received_bytes)} @ {format_bps(result.received_bps)}")
+        lines.append(
+            f"  Received: {format_bytes(result.received_bytes)} @ {format_bps(result.received_bps)}"
+        )
 
         if result.retransmits is not None:
             lines.append(f"  Retransmits: {result.retransmits}")
@@ -521,9 +527,7 @@ def format_iperf_result(result: IperfResult, use_color: bool = True) -> str:
             lines.append(f"  Jitter: {result.jitter_ms:.3f}ms")
 
         if result.lost_packets is not None:
-            lines.append(
-                f"  Lost: {result.lost_packets} packets ({result.lost_percent:.2f}%)"
-            )
+            lines.append(f"  Lost: {result.lost_packets} packets ({result.lost_percent:.2f}%)")
 
     if result.error:
         error_text = f"\033[31m{result.error}\033[0m" if use_color else result.error

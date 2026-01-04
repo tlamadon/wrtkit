@@ -18,24 +18,16 @@ def main():
     config = UCIConfig()
 
     # Configure network interface
-    config.network.interface("lan") \
-        .device("eth0") \
-        .proto("static") \
-        .ipaddr("192.168.1.1") \
-        .netmask("255.255.255.0")
+    config.network.interface("lan").device("eth0").proto("static").ipaddr("192.168.1.1").netmask(
+        "255.255.255.0"
+    )
 
     # Configure wireless
-    config.wireless.radio("radio0") \
-        .channel(11) \
-        .htmode("HT20")
+    config.wireless.radio("radio0").channel(11).htmode("HT20")
 
-    config.wireless.wifi_iface("default_radio0") \
-        .device("radio0") \
-        .network("lan") \
-        .mode("ap") \
-        .ssid("MyOpenWRT") \
-        .encryption("psk2") \
-        .key("mypassword123")
+    config.wireless.wifi_iface("default_radio0").device("radio0").network("lan").mode("ap").ssid(
+        "MyOpenWRT"
+    ).encryption("psk2").key("mypassword123")
 
     print("\n" + "=" * 70)
     print("Configuration Summary")
@@ -57,9 +49,9 @@ def main():
         # Create serial connection
         # Note: You may need to adjust the port and baudrate
         serial = SerialConnection(
-            port="/dev/ttyUSB0",      # Change to your serial port
-            baudrate=115200,           # Most OpenWRT devices use 115200
-            timeout=5.0,               # Command timeout in seconds
+            port="/dev/ttyUSB0",  # Change to your serial port
+            baudrate=115200,  # Most OpenWRT devices use 115200
+            timeout=5.0,  # Command timeout in seconds
             prompt=r"root@[^:]+:.*[#\$]",  # Shell prompt pattern
             # If your device requires login:
             # login_username="root",

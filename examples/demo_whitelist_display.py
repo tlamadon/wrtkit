@@ -35,10 +35,12 @@ lan = NetworkInterface("lan").with_proto("static").with_ipaddr("192.168.1.1")
 config.network.add_interface(lan)
 
 # Configure whitelist to preserve some remote settings
-config.network.remote_policy = RemotePolicy(whitelist=[
-    "interfaces.*.gateway",     # Keep gateway on all interfaces
-    "interfaces.guest.*",        # Keep entire guest interface
-])
+config.network.remote_policy = RemotePolicy(
+    whitelist=[
+        "interfaces.*.gateway",  # Keep gateway on all interfaces
+        "interfaces.guest.*",  # Keep entire guest interface
+    ]
+)
 
 # Get the diff
 diff = config.diff(MockSSH(), show_remote_only=True)

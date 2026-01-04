@@ -28,17 +28,19 @@ class Colors:
 
 
 # Field names that contain sensitive data and should be masked
-SENSITIVE_FIELDS = frozenset({
-    "key",           # WiFi WPA key
-    "password",      # Generic password
-    "wpakey",        # WPA key variant
-    "sae_password",  # WPA3 SAE password
-    "psk",           # Pre-shared key
-    "secret",        # Generic secret
-    "auth_secret",   # Authentication secret
-    "priv_passwd",   # SNMP private password
-    "auth_passwd",   # SNMP auth password
-})
+SENSITIVE_FIELDS = frozenset(
+    {
+        "key",  # WiFi WPA key
+        "password",  # Generic password
+        "wpakey",  # WPA key variant
+        "sae_password",  # WPA3 SAE password
+        "psk",  # Pre-shared key
+        "secret",  # Generic secret
+        "auth_secret",  # Authentication secret
+        "priv_passwd",  # SNMP private password
+        "auth_passwd",  # SNMP auth password
+    }
+)
 
 
 def mask_sensitive_value(value: Any, visible_chars: int = 3) -> str:
@@ -91,12 +93,12 @@ class ConfigDiff:
         self.to_add: List[UCICommand] = []
         self.to_remove: List[UCICommand] = []
         self.to_modify: List[tuple[UCICommand, UCICommand]] = []
-        self.remote_only: List[UCICommand] = (
-            []
-        )  # UCI settings on remote but not mentioned in config (NOT whitelisted, will be deleted)
-        self.whitelisted: List[UCICommand] = (
-            []
-        )  # UCI settings on remote that are whitelisted (preserved)
+        self.remote_only: List[
+            UCICommand
+        ] = []  # UCI settings on remote but not mentioned in config (NOT whitelisted, will be deleted)
+        self.whitelisted: List[
+            UCICommand
+        ] = []  # UCI settings on remote that are whitelisted (preserved)
         self.common: List[UCICommand] = []  # UCI settings that match between local and remote
         # Section-level tracking for tree display
         self._local_sections: set[tuple[str, str]] = (
@@ -697,12 +699,7 @@ class UCIConfig:
 
         return commands
 
-    def _get_logical_path(
-        self,
-        uci_path: str,
-        section_types: Dict[str, str],
-        package: str
-    ) -> str:
+    def _get_logical_path(self, uci_path: str, section_types: Dict[str, str], package: str) -> str:
         """
         Convert a UCI path to a logical path for whitelist matching.
 
@@ -896,7 +893,9 @@ class UCIConfig:
                         if remote_policy.whitelist:
                             # New whitelist approach - construct logical path
                             pkg_section_types = section_types.get(cmd_package, {})
-                            logical_path = self._get_logical_path(cmd.path, pkg_section_types, cmd_package)
+                            logical_path = self._get_logical_path(
+                                cmd.path, pkg_section_types, cmd_package
+                            )
                             if remote_policy.should_keep_remote_path(logical_path):
                                 is_whitelisted = True
                             else:
@@ -905,7 +904,9 @@ class UCIConfig:
                             # Legacy behavior for backward compatibility
                             if cmd.action == "add_list":
                                 # For list values, check both section and value
-                                if not remote_policy.should_keep_remote_value(cmd_section, str(cmd.value)):
+                                if not remote_policy.should_keep_remote_value(
+                                    cmd_section, str(cmd.value)
+                                ):
                                     should_remove = True
                             else:
                                 # For regular settings, check if section is allowed
@@ -918,7 +919,9 @@ class UCIConfig:
                         if remote_policy.whitelist:
                             # Check if this specific path is whitelisted
                             pkg_section_types = section_types.get(cmd_package, {})
-                            logical_path = self._get_logical_path(cmd.path, pkg_section_types, cmd_package)
+                            logical_path = self._get_logical_path(
+                                cmd.path, pkg_section_types, cmd_package
+                            )
                             if remote_policy.should_keep_remote_path(logical_path):
                                 is_whitelisted = True
                             else:
