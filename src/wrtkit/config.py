@@ -114,6 +114,32 @@ class ConfigDiff:
         """Check if there are any changes to apply (excluding remote-only)."""
         return bool(self.to_add or self.to_remove or self.to_modify)
 
+    def get_changed_packages(self) -> set[str]:
+        """
+        Get the set of packages that have changes.
+
+        Returns:
+            Set of package names (e.g., {"network", "wireless"}) that have changes.
+        """
+        packages: set[str] = set()
+
+        for cmd in self.to_add:
+            parts = cmd.path.split(".")
+            if parts:
+                packages.add(parts[0])
+
+        for cmd in self.to_remove:
+            parts = cmd.path.split(".")
+            if parts:
+                packages.add(parts[0])
+
+        for old_cmd, new_cmd in self.to_modify:
+            parts = new_cmd.path.split(".")
+            if parts:
+                packages.add(parts[0])
+
+        return packages
+
     def get_removal_commands(self, packages: Optional[List[str]] = None) -> List[UCICommand]:
         """
         Get UCI delete commands for items that should be removed.
@@ -977,16 +1003,32 @@ class UCIConfig:
         """
         commands = self.get_all_commands()
 
+        # Determine which packages are being configured
+        changed_packages: set[str] = set()
+        for cmd in commands:
+            parts = cmd.path.split(".")
+            if parts:
+                changed_packages.add(parts[0])
+
         if dry_run:
-            print("Dry run - commands that would be executed:")
+            print("[Dry run mode - no changes made]")
+            if not commands:
+                print("No commands to execute.")
+                return
             for cmd in commands:
-                print(f"  {cmd.to_string()}")
-            if auto_commit:
-                print("  uci commit")
-            if auto_reload:
-                print("  /etc/init.d/network restart")
-                print("  wifi reload")
-                print("  /etc/init.d/dnsmasq restart")
+                print(f"Would run: {cmd.to_string()}")
+            if auto_commit and commands:
+                print("Would run: uci commit")
+            if auto_reload and commands:
+                # Show only relevant restart commands based on packages being configured
+                if "network" in changed_packages or "sqm" in changed_packages:
+                    print("Would run: /etc/init.d/network restart")
+                if "wireless" in changed_packages:
+                    print("Would run: wifi reload")
+                if "dhcp" in changed_packages:
+                    print("Would run: /etc/init.d/dnsmasq restart")
+                if "firewall" in changed_packages:
+                    print("Would run: /etc/init.d/firewall reload")
             return
 
         # Calculate total steps
@@ -1020,11 +1062,11 @@ class UCIConfig:
                     progress.update(message="Committing changes")
                 ssh.commit_changes()
 
-            # Reload configuration
+            # Reload configuration (only services for changed packages)
             if auto_reload:
                 if progress:
                     progress.update(message="Reloading services")
-                ssh.reload_config()
+                ssh.reload_config(changed_packages=changed_packages)
 
             if progress:
                 progress.finish(f"✓ Applied {len(commands)} commands")
@@ -1115,16 +1157,33 @@ class UCIConfig:
         for old_cmd, new_cmd in diff.to_modify:
             commands_to_run.append(new_cmd)
 
+        # Get which packages have changes for targeted service restarts
+        changed_packages = diff.get_changed_packages()
+
         if dry_run:
-            print("Dry run - commands that would be executed:")
+            print("[Dry run mode - no changes made]")
+            if not commands_to_run:
+                print("No commands to execute.")
+                return diff
             for cmd in commands_to_run:
-                print(f"  {cmd.to_string()}")
-            if auto_commit:
-                print("  uci commit")
-            if auto_reload:
-                print("  /etc/init.d/network restart")
-                print("  wifi reload")
-                print("  /etc/init.d/dnsmasq restart")
+                print(f"Would run: {cmd.to_string()}")
+            if auto_commit and commands_to_run:
+                print("Would run: uci commit")
+            if auto_reload and commands_to_run:
+                # Show only relevant restart commands based on changed packages
+                if "network" in changed_packages or "sqm" in changed_packages:
+                    print("Would run: /etc/init.d/network restart")
+                if "wireless" in changed_packages:
+                    print("Would run: wifi reload")
+                if "dhcp" in changed_packages:
+                    print("Would run: /etc/init.d/dnsmasq restart")
+                if "firewall" in changed_packages:
+                    print("Would run: /etc/init.d/firewall reload")
+            return diff
+
+        # If no commands to run, skip commit and reload
+        if not commands_to_run:
+            print("No changes to apply.")
             return diff
 
         # Execute commands with progress
@@ -1152,17 +1211,17 @@ class UCIConfig:
                         progress.finish(f"✗ Failed at command: {cmd.to_string()}")
                     raise RuntimeError(f"Failed to execute command '{cmd.to_string()}': {stderr}")
 
-            # Commit changes
+            # Commit changes (only if we actually ran commands)
             if auto_commit:
                 if progress:
                     progress.update(message="Committing changes")
                 ssh.commit_changes()
 
-            # Reload configuration
+            # Reload configuration (only services for changed packages)
             if auto_reload:
                 if progress:
                     progress.update(message="Reloading services")
-                ssh.reload_config()
+                ssh.reload_config(changed_packages=changed_packages)
 
             if progress:
                 progress.finish(f"✓ Applied {len(commands_to_run)} changes")

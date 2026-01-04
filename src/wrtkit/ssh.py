@@ -129,26 +129,65 @@ class SSHConnection:
             if exit_code != 0:
                 raise RuntimeError(f"Failed to commit changes: {stderr}")
 
-    def reload_config(self, reload_dhcp: bool = True) -> None:
+    def reload_config(
+        self,
+        reload_dhcp: bool = True,
+        changed_packages: set[str] | None = None,
+    ) -> list[str]:
         """
         Reload network configuration and wireless settings.
 
+        Only restarts services related to packages that actually changed.
+
         Args:
             reload_dhcp: If True, also restart dnsmasq to apply DHCP changes
+                (only when dhcp package changed or changed_packages is None)
+            changed_packages: Set of package names that have changes.
+                If None, restarts all services (legacy behavior).
+                If empty set, restarts nothing.
+
+        Returns:
+            List of commands that were executed.
         """
-        commands = [
-            "/etc/init.d/network restart",
-            "wifi reload",
-        ]
+        # If changed_packages is empty set, nothing to restart
+        if changed_packages is not None and len(changed_packages) == 0:
+            return []
 
-        if reload_dhcp:
-            commands.append("/etc/init.d/dnsmasq restart")
+        commands: list[str] = []
 
+        # Determine which services need restart based on changed packages
+        if changed_packages is None:
+            # Legacy behavior: restart all
+            commands.append("/etc/init.d/network restart")
+            commands.append("wifi reload")
+            if reload_dhcp:
+                commands.append("/etc/init.d/dnsmasq restart")
+        else:
+            # Package-aware restart
+            # network and sqm changes require network restart
+            if "network" in changed_packages or "sqm" in changed_packages:
+                commands.append("/etc/init.d/network restart")
+
+            # wireless changes require wifi reload
+            if "wireless" in changed_packages:
+                commands.append("wifi reload")
+
+            # dhcp changes require dnsmasq restart
+            if "dhcp" in changed_packages and reload_dhcp:
+                commands.append("/etc/init.d/dnsmasq restart")
+
+            # firewall changes require firewall reload
+            if "firewall" in changed_packages:
+                commands.append("/etc/init.d/firewall reload")
+
+        # Execute commands (deduplicated by using list, no duplicates added above)
         for cmd in commands:
             stdout, stderr, exit_code = self.execute(cmd)
             if exit_code != 0:
                 print(f"Warning: {cmd} returned non-zero exit code: {stderr}")
             time.sleep(1)
+
+        return commands
 
     def __enter__(self) -> "SSHConnection":
         """Context manager entry."""
