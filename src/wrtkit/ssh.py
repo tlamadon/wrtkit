@@ -1,7 +1,7 @@
 """SSH connection management for remote OpenWRT devices."""
 
 import paramiko
-from typing import Optional, Tuple, List
+from typing import Optional, Tuple, List, Set
 import time
 
 
@@ -132,8 +132,8 @@ class SSHConnection:
     def reload_config(
         self,
         reload_dhcp: bool = True,
-        changed_packages: set[str] | None = None,
-    ) -> list[str]:
+        changed_packages: Optional[Set[str]] = None,
+    ) -> List[str]:
         """
         Reload network configuration and wireless settings.
 
@@ -153,7 +153,7 @@ class SSHConnection:
         if changed_packages is not None and len(changed_packages) == 0:
             return []
 
-        commands: list[str] = []
+        commands: List[str] = []
 
         # Determine which services need restart based on changed packages
         if changed_packages is None:
