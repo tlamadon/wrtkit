@@ -560,3 +560,101 @@ dhcp:
     assert any(cmd.path == "dhcp.printer" and cmd.value == "host" for cmd in commands)
     assert any(cmd.path == "dhcp.printer.mac" for cmd in commands)
     assert any(cmd.path == "dhcp.server" and cmd.value == "host" for cmd in commands)
+
+
+def test_bridge_vlan_yaml_roundtrip():
+    """Test YAML serialization and deserialization of bridge VLANs."""
+    from wrtkit import UCIConfig, BridgeVLAN
+
+    # Create a config with bridge VLANs
+    config = UCIConfig()
+    vlan10 = (
+        BridgeVLAN("br_trunk_vlan10")
+        .with_device("br-trunk")
+        .with_vlan(10)
+        .with_ports(["lan1:u*", "lan2:u*", "lan3:u*", "wds0:t"])
+    )
+    config.network.add_bridge_vlan(vlan10)
+
+    vlan20 = (
+        BridgeVLAN("br_trunk_vlan20")
+        .with_device("br-trunk")
+        .with_vlan(20)
+        .with_ports(["lan4:u*", "wds1:t"])
+    )
+    config.network.add_bridge_vlan(vlan20)
+
+    # Test YAML serialization
+    yaml_str = config.to_yaml()
+    assert "bridge_vlans:" in yaml_str
+    assert "br_trunk_vlan10:" in yaml_str
+    assert "device: br-trunk" in yaml_str
+    assert "vlan: 10" in yaml_str
+    assert "lan1:u*" in yaml_str
+
+    # Test YAML deserialization
+    restored = UCIConfig.from_yaml(yaml_str)
+    assert len(restored.network.bridge_vlans) == 2
+
+    # Check first VLAN
+    vlan10_restored = next(
+        bv for bv in restored.network.bridge_vlans if bv._section == "br_trunk_vlan10"
+    )
+    assert vlan10_restored.device == "br-trunk"
+    assert vlan10_restored.vlan == 10
+    assert len(vlan10_restored.ports) == 4
+    assert "lan1:u*" in vlan10_restored.ports
+    assert "wds0:t" in vlan10_restored.ports
+
+    # Check second VLAN
+    vlan20_restored = next(
+        bv for bv in restored.network.bridge_vlans if bv._section == "br_trunk_vlan20"
+    )
+    assert vlan20_restored.device == "br-trunk"
+    assert vlan20_restored.vlan == 20
+    assert len(vlan20_restored.ports) == 2
+
+    # Verify UCI commands are generated correctly
+    commands = restored.get_all_commands()
+    assert any(
+        cmd.path == "network.br_trunk_vlan10" and cmd.value == "bridge-vlan" for cmd in commands
+    )
+    assert any(
+        cmd.path == "network.br_trunk_vlan10.device" and cmd.value == "br-trunk"
+        for cmd in commands
+    )
+    assert any(
+        cmd.path == "network.br_trunk_vlan10.vlan" and cmd.value == "10" for cmd in commands
+    )
+
+
+def test_bridge_vlan_from_yaml():
+    """Test loading bridge VLANs from YAML."""
+    yaml_str = """
+network:
+  bridge_vlans:
+    br_trunk_vlan10:
+      device: br-trunk
+      vlan: 10
+      ports:
+        - lan1:u*
+        - lan2:u*
+        - lan3:u*
+        - wds0:t
+"""
+    config = UCIConfig.from_yaml(yaml_str)
+
+    assert len(config.network.bridge_vlans) == 1
+    vlan = config.network.bridge_vlans[0]
+    assert vlan._section == "br_trunk_vlan10"
+    assert vlan.device == "br-trunk"
+    assert vlan.vlan == 10
+    assert vlan.ports == ["lan1:u*", "lan2:u*", "lan3:u*", "wds0:t"]
+
+    # Check UCI commands
+    commands = config.get_all_commands()
+    assert any(
+        cmd.path == "network.br_trunk_vlan10" and cmd.value == "bridge-vlan" for cmd in commands
+    )
+    port_commands = [cmd for cmd in commands if cmd.path == "network.br_trunk_vlan10.ports"]
+    assert len(port_commands) == 4

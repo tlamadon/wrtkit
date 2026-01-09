@@ -1,6 +1,6 @@
 """Tests for network configuration."""
 
-from wrtkit.network import NetworkConfig, NetworkDevice, NetworkInterface
+from wrtkit.network import NetworkConfig, NetworkDevice, NetworkInterface, BridgeVLAN
 from wrtkit.base import UCICommand
 
 
@@ -89,3 +89,61 @@ def test_vlan_device():
 
     assert any(cmd.path == "network.bat0_vlan10.type" and cmd.value == "8021q" for cmd in commands)
     assert any(cmd.path == "network.bat0_vlan10.vid" and cmd.value == "10" for cmd in commands)
+
+
+def test_bridge_vlan_creation():
+    """Test creating a bridge VLAN configuration."""
+    net = NetworkConfig()
+    bridge_vlan = (
+        BridgeVLAN("br_trunk_vlan10")
+        .with_device("br-trunk")
+        .with_vlan(10)
+        .with_port("lan1:u*")
+        .with_port("lan2:u*")
+        .with_port("lan3:u*")
+        .with_port("wds0:t")
+    )
+
+    net.add_bridge_vlan(bridge_vlan)
+
+    commands = net.get_commands()
+
+    # Check section type
+    assert commands[0] == UCICommand("set", "network.br_trunk_vlan10", "bridge-vlan")
+    # Check device
+    assert any(
+        cmd.path == "network.br_trunk_vlan10.device" and cmd.value == "br-trunk"
+        for cmd in commands
+    )
+    # Check VLAN ID
+    assert any(
+        cmd.path == "network.br_trunk_vlan10.vlan" and cmd.value == "10" for cmd in commands
+    )
+    # Check ports (should be list items)
+    port_commands = [cmd for cmd in commands if cmd.path == "network.br_trunk_vlan10.ports"]
+    assert len(port_commands) == 4
+    assert any(cmd.value == "lan1:u*" for cmd in port_commands)
+    assert any(cmd.value == "lan2:u*" for cmd in port_commands)
+    assert any(cmd.value == "lan3:u*" for cmd in port_commands)
+    assert any(cmd.value == "wds0:t" for cmd in port_commands)
+
+
+def test_bridge_vlan_with_ports_method():
+    """Test creating a bridge VLAN using with_ports method."""
+    net = NetworkConfig()
+    bridge_vlan = (
+        BridgeVLAN("br_trunk_vlan20")
+        .with_device("br-trunk")
+        .with_vlan(20)
+        .with_ports(["lan1:u*", "lan2:u*", "wds0:t"])
+    )
+
+    net.add_bridge_vlan(bridge_vlan)
+
+    commands = net.get_commands()
+
+    # Check section type
+    assert commands[0] == UCICommand("set", "network.br_trunk_vlan20", "bridge-vlan")
+    # Check that all ports are present
+    port_commands = [cmd for cmd in commands if cmd.path == "network.br_trunk_vlan20.ports"]
+    assert len(port_commands) == 3

@@ -68,6 +68,84 @@ python examples/serial_example.py test
 
 **Note:** Make sure no other program is using the serial port, and you have permission to access it (add your user to the `dialout` group on Linux).
 
+### vlan_example.py
+
+Comprehensive VLAN configuration examples in **Python**, demonstrating:
+- Basic 802.1Q VLAN tagging on single interfaces
+- Bridge VLAN filtering for managed switches
+- VLAN trunk ports with multiple VLANs
+- Mixed tagged and untagged VLAN traffic
+- Inter-VLAN routing (router-on-a-stick)
+- VLANs on batman-adv mesh interfaces
+- Port-based VLAN isolation
+
+Run with:
+```bash
+python examples/vlan_example.py
+```
+
+This example shows six different VLAN scenarios:
+1. **Basic 802.1Q VLANs** - Create tagged VLANs on a single interface
+2. **Bridge VLAN Filtering** - Configure VLAN-aware bridges with access and trunk ports
+3. **Multiple VLANs on Trunk** - Carry multiple VLANs over a single trunk port
+4. **VLANs on batman-adv** - Network segmentation in mesh networks
+5. **Port-based Isolation** - Isolate each physical port to its own VLAN
+6. **Inter-VLAN Routing** - Enable routing between VLANs
+
+**Port tagging reference:**
+- `port:t` - Tagged (trunk port)
+- `port:u*` - Untagged and PVID (access port)
+- `port:*` - Tagged only, no PVID
+- `port:u` - Untagged only
+
+### VLAN_YAML_GUIDE.md + YAML Examples
+
+**Comprehensive guide** for VLAN configuration using **YAML format**. YAML is more concise and easier to manage than Python code for configuration-as-code workflows.
+
+**YAML Example Files:**
+- `vlan_basic.yaml` - Basic 802.1Q VLANs
+- `vlan_bridge_filtering.yaml` - Bridge VLAN with access/trunk ports
+- `vlan_inter_routing.yaml` - Inter-VLAN routing with firewall
+
+**Features:**
+- Human-readable configuration format
+- Version control friendly
+- Easy to template and share
+- Complete examples with DHCP and firewall
+- Port tagging reference and best practices
+
+Read the guide:
+```bash
+cat examples/VLAN_YAML_GUIDE.md
+```
+
+Use YAML configs:
+```bash
+wrtkit preview examples/vlan_basic.yaml
+wrtkit apply examples/vlan_basic.yaml
+```
+
+Or in Python:
+```python
+from wrtkit.config import UCIConfig
+
+config = UCIConfig.from_yaml_file("examples/vlan_basic.yaml")
+# Preview, modify, or apply
+```
+
+### whitelist_example.py
+
+Demonstrates the remote policy whitelist feature for managing router configurations:
+- Whitelisting specific remote settings to keep
+- Pattern matching with wildcards
+- Combining with allowed_sections for backwards compatibility
+- Practical use cases for preserving device-specific settings
+
+Run with:
+```bash
+python examples/whitelist_example.py
+```
+
 ## Usage Patterns
 
 ### 1. Generate Configuration Scripts

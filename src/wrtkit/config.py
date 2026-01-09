@@ -6,7 +6,7 @@ import yaml
 from omegaconf import OmegaConf
 from typing import List, Dict, Any, Optional, Union, cast
 from .base import UCICommand, RemotePolicy
-from .network import NetworkConfig, NetworkInterface, NetworkDevice
+from .network import NetworkConfig, NetworkInterface, NetworkDevice, BridgeVLAN
 from .wireless import WirelessConfig, WirelessRadio, WirelessInterface
 from .dhcp import DHCPConfig, DHCPSection, DHCPHost
 from .firewall import FirewallConfig, FirewallZone, FirewallForwarding
@@ -1506,7 +1506,7 @@ class UCIConfig:
         result: Dict[str, Any] = {}
 
         # Network configuration
-        if self.network.devices or self.network.interfaces:
+        if self.network.devices or self.network.interfaces or self.network.bridge_vlans:
             network_dict: Dict[str, Any] = {}
 
             if self.network.devices:
@@ -1522,6 +1522,14 @@ class UCIConfig:
                         exclude_none=exclude_none
                     )
                 network_dict["interfaces"] = interfaces_dict
+
+            if self.network.bridge_vlans:
+                bridge_vlans_dict = {}
+                for bridge_vlan in self.network.bridge_vlans:
+                    bridge_vlans_dict[bridge_vlan._section] = bridge_vlan.to_dict(
+                        exclude_none=exclude_none
+                    )
+                network_dict["bridge_vlans"] = bridge_vlans_dict
 
             result["network"] = network_dict
 
@@ -1667,6 +1675,11 @@ class UCIConfig:
                 for section_name, interface_data in network_data["interfaces"].items():
                     interface = NetworkInterface(section_name, **interface_data)
                     config.network.add_interface(interface)
+
+            if "bridge_vlans" in network_data:
+                for section_name, bridge_vlan_data in network_data["bridge_vlans"].items():
+                    bridge_vlan = BridgeVLAN(section_name, **bridge_vlan_data)
+                    config.network.add_bridge_vlan(bridge_vlan)
 
             if "remote_policy" in network_data:
                 config.network.remote_policy = RemotePolicy(**network_data["remote_policy"])

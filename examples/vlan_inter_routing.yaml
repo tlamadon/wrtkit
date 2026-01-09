@@ -1,0 +1,106 @@
+# Example: Inter-VLAN Routing (Router-on-a-stick)
+# =================================================
+# Multiple VLANs that can route between each other through OpenWRT
+# IMPORTANT: Add firewall rules to control traffic between VLANs!
+
+network:
+  devices:
+    vlan10:
+      type: 8021q
+      ifname: eth0
+      vid: 10
+      name: eth0.10
+
+    vlan20:
+      type: 8021q
+      ifname: eth0
+      vid: 20
+      name: eth0.20
+
+    vlan30:
+      type: 8021q
+      ifname: eth0
+      vid: 30
+      name: eth0.30
+
+    vlan40:
+      type: 8021q
+      ifname: eth0
+      vid: 40
+      name: eth0.40
+
+  interfaces:
+    management:
+      device: eth0.10
+      proto: static
+      ipaddr: 192.168.10.1
+      netmask: 255.255.255.0
+
+    office:
+      device: eth0.20
+      proto: static
+      ipaddr: 192.168.20.1
+      netmask: 255.255.255.0
+
+    guest:
+      device: eth0.30
+      proto: static
+      ipaddr: 192.168.30.1
+      netmask: 255.255.255.0
+
+    servers:
+      device: eth0.40
+      proto: static
+      ipaddr: 192.168.40.1
+      netmask: 255.255.255.0
+
+firewall:
+  zones:
+    zone_mgmt:
+      name: management
+      network:
+        - management
+      input: ACCEPT
+      output: ACCEPT
+      forward: ACCEPT
+
+    zone_office:
+      name: office
+      network:
+        - office
+      input: ACCEPT
+      output: ACCEPT
+      forward: REJECT
+
+    zone_guest:
+      name: guest
+      network:
+        - guest
+      input: REJECT
+      output: ACCEPT
+      forward: REJECT
+
+    zone_servers:
+      name: servers
+      network:
+        - servers
+      input: REJECT
+      output: ACCEPT
+      forward: REJECT
+
+  forwardings:
+    fwd_office_servers:
+      src: office
+      dest: servers
+
+    fwd_mgmt_office:
+      src: management
+      dest: office
+
+    fwd_mgmt_guest:
+      src: management
+      dest: guest
+
+    fwd_mgmt_servers:
+      src: management
+      dest: servers

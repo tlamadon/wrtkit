@@ -134,11 +134,45 @@ class NetworkInterface(UCISection):
         return self.model_copy(update={"proto": "dhcp"})
 
 
+class BridgeVLAN(UCISection):
+    """Represents a bridge VLAN configuration."""
+
+    device: Optional[str] = None
+    vlan: Optional[int] = None
+    ports: List[str] = Field(default_factory=list)
+
+    def __init__(self, vlan_name: str, **data: Any) -> None:
+        super().__init__(**data)
+        self._package = "network"
+        self._section = vlan_name
+        self._section_type = "bridge-vlan"
+
+    # Immutable builder methods (composable)
+    def with_device(self, value: str) -> "BridgeVLAN":
+        """Set the bridge device (returns new copy)."""
+        return self.model_copy(update={"device": value})
+
+    def with_vlan(self, value: int) -> "BridgeVLAN":
+        """Set the VLAN ID (returns new copy)."""
+        return self.model_copy(update={"vlan": value})
+
+    def with_port(self, port: str) -> "BridgeVLAN":
+        """Add a port to the VLAN (returns new copy)."""
+        ports = self.ports.copy()
+        ports.append(port)
+        return self.model_copy(update={"ports": ports})
+
+    def with_ports(self, ports: List[str]) -> "BridgeVLAN":
+        """Set all ports for the VLAN (returns new copy)."""
+        return self.model_copy(update={"ports": ports.copy()})
+
+
 class NetworkConfig(UCISection):
     """Network configuration manager."""
 
     devices: List[NetworkDevice] = Field(default_factory=list)
     interfaces: List[NetworkInterface] = Field(default_factory=list)
+    bridge_vlans: List[BridgeVLAN] = Field(default_factory=list)
     remote_policy: Optional[RemotePolicy] = None
 
     def __init__(self, **data: Any) -> None:
@@ -157,6 +191,11 @@ class NetworkConfig(UCISection):
         self.interfaces.append(interface)
         return self
 
+    def add_bridge_vlan(self, bridge_vlan: BridgeVLAN) -> "NetworkConfig":
+        """Add a bridge VLAN and return self for chaining."""
+        self.bridge_vlans.append(bridge_vlan)
+        return self
+
     def get_commands(self) -> List[UCICommand]:
         """Get all UCI commands for network configuration."""
         commands = []
@@ -164,4 +203,6 @@ class NetworkConfig(UCISection):
             commands.extend(device.get_commands())
         for interface in self.interfaces:
             commands.extend(interface.get_commands())
+        for bridge_vlan in self.bridge_vlans:
+            commands.extend(bridge_vlan.get_commands())
         return commands

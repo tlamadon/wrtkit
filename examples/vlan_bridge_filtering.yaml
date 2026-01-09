@@ -1,0 +1,61 @@
+# Example 2: Bridge VLAN Filtering
+# =================================
+# Creates a VLAN-aware bridge with access and trunk ports
+#
+# Port configuration:
+#   lan1: VLAN 10 untagged (access port)
+#   lan2: VLAN 10 untagged (access port)
+#   lan3: VLAN 20 untagged (access port)
+#   lan4: VLANs 10+20 tagged (trunk port)
+
+network:
+  devices:
+    br_trunk:
+      type: bridge
+      name: br-trunk
+      ports:
+        - lan1
+        - lan2
+        - lan3
+        - lan4
+
+    br_vlan10:
+      type: 8021q
+      ifname: br-trunk
+      vid: 10
+      name: br-trunk.10
+
+    br_vlan20:
+      type: 8021q
+      ifname: br-trunk
+      vid: 20
+      name: br-trunk.20
+
+  bridge_vlans:
+    vlan10:
+      device: br-trunk
+      vlan: 10
+      ports:
+        - lan1:u*  # Untagged, PVID
+        - lan2:u*  # Untagged, PVID
+        - lan4:t   # Tagged (trunk)
+
+    vlan20:
+      device: br-trunk
+      vlan: 20
+      ports:
+        - lan3:u*  # Untagged, PVID
+        - lan4:t   # Tagged (trunk)
+
+  interfaces:
+    guest:
+      device: br-trunk.10
+      proto: static
+      ipaddr: 192.168.10.1
+      netmask: 255.255.255.0
+
+    iot:
+      device: br-trunk.20
+      proto: static
+      ipaddr: 192.168.20.1
+      netmask: 255.255.255.0

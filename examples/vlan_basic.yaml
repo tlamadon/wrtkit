@@ -1,0 +1,34 @@
+# Example 1: Basic 802.1Q VLANs
+# =============================
+# Creates VLAN 10 (guest) and VLAN 20 (iot) on eth0
+#
+# Network topology:
+#   eth0 (trunk) ──┬── VLAN 10 (192.168.10.0/24) - Guest WiFi
+#                  └── VLAN 20 (192.168.20.0/24) - IoT Devices
+
+network:
+  devices:
+    vlan10:
+      type: 8021q
+      ifname: eth0
+      vid: 10
+      name: eth0.10
+
+    vlan20:
+      type: 8021q
+      ifname: eth0
+      vid: 20
+      name: eth0.20
+
+  interfaces:
+    guest:
+      device: eth0.10
+      proto: static
+      ipaddr: 192.168.10.1
+      netmask: 255.255.255.0
+
+    iot:
+      device: eth0.20
+      proto: static
+      ipaddr: 192.168.20.1
+      netmask: 255.255.255.0

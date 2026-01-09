@@ -4,7 +4,7 @@ from .config import UCIConfig
 from .base import RemotePolicy
 from .ssh import SSHConnection
 from .serial_connection import SerialConnection
-from .network import NetworkConfig, NetworkDevice, NetworkInterface
+from .network import NetworkConfig, NetworkDevice, NetworkInterface, BridgeVLAN
 from .wireless import WirelessConfig, WirelessRadio, WirelessInterface
 from .dhcp import DHCPConfig, DHCPSection, DHCPHost
 from .firewall import FirewallConfig, FirewallZone, FirewallForwarding
@@ -29,6 +29,7 @@ __all__ = [
     "NetworkConfig",
     "NetworkDevice",
     "NetworkInterface",
+    "BridgeVLAN",
     "WirelessConfig",
     "WirelessRadio",
     "WirelessInterface",
